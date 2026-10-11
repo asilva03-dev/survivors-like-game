@@ -4,7 +4,8 @@
  *
  * - Put it on a world-space Canvas at the origin with scale 1; numbers are children of it and are
  *   positioned directly in world space.
- * - Listens to Enemy.Damaged. Each number appears at the enemy's position plus heightOffset, at a
+ * - Listens to Damageable.Damaged, so enemies, trees and anything else damageable all show numbers.
+ *   Each number appears at the target's position plus heightOffset, at a
  *   random point within spawnRadius, so rapid hits do not stack on one spot.
  * - Numbers come from a ComponentPool<DamageNumber> built from numberPrefab (prewarmed); the pool
  *   grows if many hits land at once.
@@ -27,14 +28,14 @@ public class DamageNumberSpawner : MonoBehaviour
         pool = new ComponentPool<DamageNumber>(numberPrefab, transform, prewarmCount);
     }
 
-    private void OnEnable() => Enemy.Damaged += HandleDamaged;
+    private void OnEnable() => Damageable.Damaged += HandleDamaged;
 
-    private void OnDisable() => Enemy.Damaged -= HandleDamaged;
+    private void OnDisable() => Damageable.Damaged -= HandleDamaged;
 
-    private void HandleDamaged(Enemy enemy, float amount)
+    private void HandleDamaged(Damageable target, float amount)
     {
         Vector2 offset = Random.insideUnitCircle * style.spawnRadius;
-        Vector3 position = enemy.transform.position + new Vector3(offset.x, style.heightOffset, offset.y);
+        Vector3 position = target.transform.position + new Vector3(offset.x, style.heightOffset, offset.y);
 
         DamageNumber number = pool.Get(position, Quaternion.identity);
         number.Show(pool, style, position, Mathf.Max(1, Mathf.RoundToInt(amount)).ToString());

@@ -4,7 +4,7 @@
  * Survivors style.
  *
  * - Enemies come from a ComponentPool<Enemy> built from enemyPrefab (prewarmed), never
- *   Instantiate/Destroy at runtime. Dead enemies are returned to the pool via Enemy.Died.
+ *   Instantiate/Destroy at runtime. Dead enemies are returned to the pool via Damageable.Died.
  * - Spawn rate (spawnsPerSecond) and the cap (maxEnemies) throttle spawning. If the cap is reached
  *   the timer holds, so there is no burst once enemies die.
  * - A spawn point is a random spot at least minSpawnDistance from the player that is also outside the
@@ -47,9 +47,9 @@ public class EnemySpawner : MonoBehaviour
         pool = new ComponentPool<Enemy>(enemyPrefab, poolRoot, prewarmCount);
     }
 
-    private void OnEnable() => Enemy.Died += HandleDied;
+    private void OnEnable() => Damageable.Died += HandleDied;
 
-    private void OnDisable() => Enemy.Died -= HandleDied;
+    private void OnDisable() => Damageable.Died -= HandleDied;
 
     private void Start()
     {
@@ -100,9 +100,9 @@ public class EnemySpawner : MonoBehaviour
         alive.Add(enemy);
     }
 
-    private void HandleDied(Enemy enemy)
+    private void HandleDied(Damageable target)
     {
-        if (alive.Remove(enemy))
+        if (target is Enemy enemy && alive.Remove(enemy))
         {
             pool.Release(enemy);
         }

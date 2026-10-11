@@ -43,6 +43,11 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
     public float RingRadius => Stats.RingRadius;
     public float SeparationDistance => Stats.SeparationDistance;
 
+    public bool CanTarget(TargetCategory category)
+    {
+        return Stats.CanTarget(category);
+    }
+
     protected virtual void OnEnable()
     {
         loadout = GetComponentInParent<WeaponLoadout>();
@@ -62,7 +67,7 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
 
     protected override void Tick()
     {
-        Enemy target;
+        Damageable target;
         Vector3 wantedSlot = Vector3.zero;
         bool hasWantedSlot;
 
@@ -73,7 +78,7 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
         }
         else
         {
-            target = Enemy.FindNearest(Owner.position, Stats.Range);
+            target = Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets);
             hasWantedSlot = false;
 
             if (target != null)
@@ -131,7 +136,7 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
         }
     }
 
-    protected abstract void Fire(Enemy target);
+    protected abstract void Fire(Damageable target);
 
     private void UpdateSlotGoal(Vector3 desired)
     {
@@ -196,9 +201,9 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
         Vector3 slot = Owner.position + direction * Stats.RingRadius;
         float sqrClearance = clearance * clearance;
 
-        for (int i = 0; i < Enemy.Active.Count; i++)
+        for (int i = 0; i < Damageable.All.Count; i++)
         {
-            Vector3 offset = Flat(Enemy.Active[i].transform.position - slot);
+            Vector3 offset = Flat(Damageable.All[i].transform.position - slot);
             if (offset.sqrMagnitude < sqrClearance)
             {
                 return true;

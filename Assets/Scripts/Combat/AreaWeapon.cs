@@ -1,11 +1,12 @@
 /*
  * AreaWeapon
- * AOE weapon: a filled zone on the ground around the owner that damages enemies inside it every
+ * AOE weapon: a filled zone on the ground around the owner that damages targets inside it every
  * 1 / attacksPerSecond seconds.
  *
  * - All numbers, the fill color and the target cap come from an AreaStats asset.
- * - Every enemy within radius takes damage on each attack, or only the nearest maxTargets when the
- *   cap is 1 or more (-1 = all). It attacks on a fixed interval whether or not anyone is inside.
+ * - Every target in a category the stats allow (enemies, resources, ...) within radius takes that
+ *   category's damage on each attack, or only the nearest maxTargets when the cap is 1 or more
+ *   (-1 = all). It attacks on a fixed interval whether or not anyone is inside.
  * - The zone is drawn as a flat disc mesh tinted by the stats color (alpha = opacity) and follows
  *   the owner. It is part of this weapon's object, so it only appears once the weapon is spawned
  *   (i.e. picked up).
@@ -27,7 +28,7 @@ public class AreaWeapon : WeaponBase<AreaStats>
     [SerializeField] private Material zoneMaterial;
     [SerializeField, Min(0f)] private float groundHeight = 0.04f;
 
-    private readonly List<Enemy> hits = new List<Enemy>();
+    private readonly List<Damageable> hits = new List<Damageable>();
     private MeshRenderer meshRenderer;
     private MaterialPropertyBlock block;
     private float flashTimer;
@@ -80,13 +81,19 @@ public class AreaWeapon : WeaponBase<AreaStats>
         float sqrRadius = Stats.Radius * Stats.Radius;
         hits.Clear();
 
-        for (int i = 0; i < Enemy.Active.Count; i++)
+        for (int i = 0; i < Damageable.All.Count; i++)
         {
-            Vector3 offset = Enemy.Active[i].transform.position - center;
+            Damageable candidate = Damageable.All[i];
+            if (!Stats.CanTarget(candidate.Category))
+            {
+                continue;
+            }
+
+            Vector3 offset = candidate.transform.position - center;
             offset.y = 0f;
             if (offset.sqrMagnitude <= sqrRadius)
             {
-                hits.Add(Enemy.Active[i]);
+                hits.Add(candidate);
             }
         }
 
@@ -98,13 +105,17 @@ public class AreaWeapon : WeaponBase<AreaStats>
 
         for (int i = 0; i < hits.Count; i++)
         {
-            hits[i].TakeDamage(Stats.Damage);
+            float amount = Stats.DamageFor(hits[i].Category);
+            if (amount > 0f)
+            {
+                hits[i].TakeDamage(amount);
+            }
         }
 
         flashTimer = Stats.FlashDuration;
     }
 
-    private static void KeepNearest(List<Enemy> list, int count, Vector3 center)
+    private static void KeepNearest(List<Damageable> list, int count, Vector3 center)
     {
         for (int k = 0; k < count; k++)
         {
@@ -127,9 +138,9 @@ public class AreaWeapon : WeaponBase<AreaStats>
         list.RemoveRange(count, list.Count - count);
     }
 
-    private static float FlatSqrDistance(Enemy enemy, Vector3 center)
+    private static float FlatSqrDistance(Damageable target, Vector3 center)
     {
-        Vector3 offset = enemy.transform.position - center;
+        Vector3 offset = target.transform.position - center;
         offset.y = 0f;
         return offset.sqrMagnitude;
     }

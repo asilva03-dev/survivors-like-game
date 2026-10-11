@@ -26,7 +26,7 @@ public class GunWeapon : AimedWeapon<GunStats>
         pool = new ComponentPool<Projectile>(Stats.ProjectilePrefab, poolRoot, Stats.PrewarmCount);
     }
 
-    protected override void Fire(Enemy target)
+    protected override void Fire(Damageable target)
     {
         Vector3 muzzle = transform.position + transform.forward * Stats.MuzzleOffset;
         bool targetBeyondMuzzle = Vector3.Dot(target.AimPoint - muzzle, transform.forward) > 0f;
@@ -36,6 +36,6 @@ public class GunWeapon : AimedWeapon<GunStats>
         direction = direction.sqrMagnitude > 0.0001f ? direction.normalized : transform.forward;
 
         Projectile projectile = pool.Get(origin, Quaternion.LookRotation(direction));
-        projectile.Launch(pool, direction, Stats.ProjectileSpeed, Stats.Damage, Stats.Lifetime, Owner);
+        projectile.Launch(pool, direction, Stats.ProjectileSpeed, Stats, Stats.Lifetime, Owner);
     }
 }

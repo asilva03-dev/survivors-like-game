@@ -4,11 +4,13 @@
  *
  * - Never created or destroyed at runtime: the weapon's ComponentPool owns it. Launch()
  *   fully resets state and the pool returns it with Release() on hit or when lifetime ends.
+ * - Damage is looked up per target category from the firing weapon's stats (WeaponStats.DamageFor),
+ *   so the same projectile hurts enemies and resources by different amounts.
  * - Hits are detected with a SphereCast along each frame's movement, so fast projectiles
- *   do not tunnel through enemies.
+ *   do not tunnel through targets.
  * - SphereCast ignores colliders it starts inside, so Launch also checks for a target overlapping
  *   the spawn point and hits it immediately (point-blank shots).
- * - Only IDamageable colliders take damage; the owner's own colliders are ignored.
+ * - Only Damageable colliders take damage; the owner's own colliders are ignored.
  *   Hitting any other collider also returns the projectile to the pool.
  * - The trail is cleared on launch so a reused projectile does not streak from its old position.
  * - Pooled prefab setup: shared unlit material, shadows off, TrailRenderer on a child at the back.
@@ -24,20 +26,20 @@ public class Projectile : MonoBehaviour
     private static readonly Collider[] overlapBuffer = new Collider[8];
 
     private ComponentPool<Projectile> pool;
+    private WeaponStats stats;
     private Transform ignoreRoot;
     private Vector3 direction;
     private float speed;
-    private float damage;
     private float lifetime;
     private float age;
 
     public void Launch(ComponentPool<Projectile> owningPool, Vector3 travelDirection, float travelSpeed,
-        float hitDamage, float maxLifetime, Transform ignore)
+        WeaponStats weaponStats, float maxLifetime, Transform ignore)
     {
         pool = owningPool;
         direction = travelDirection;
         speed = travelSpeed;
-        damage = hitDamage;
+        stats = weaponStats;
         lifetime = maxLifetime;
         ignoreRoot = ignore;
         age = 0f;
@@ -68,15 +70,24 @@ public class Projectile : MonoBehaviour
                 continue;
             }
 
-            IDamageable target = other.GetComponentInParent<IDamageable>();
+            Damageable target = other.GetComponentInParent<Damageable>();
             if (target != null)
             {
-                target.TakeDamage(damage);
+                Hit(target);
                 return true;
             }
         }
 
         return false;
+    }
+
+    private void Hit(Damageable target)
+    {
+        float amount = stats.DamageFor(target.Category);
+        if (amount > 0f)
+        {
+            target.TakeDamage(amount);
+        }
     }
 
     private void Update()
@@ -89,10 +100,10 @@ public class Projectile : MonoBehaviour
             bool isOwner = ignoreRoot != null && hit.collider.transform.IsChildOf(ignoreRoot);
             if (!isOwner)
             {
-                IDamageable target = hit.collider.GetComponentInParent<IDamageable>();
+                Damageable target = hit.collider.GetComponentInParent<Damageable>();
                 if (target != null)
                 {
-                    target.TakeDamage(damage);
+                    Hit(target);
                 }
 
                 pool.Release(this);

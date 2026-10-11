@@ -74,7 +74,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 33bd7487b0f249e408131bf1265cf7d0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnemyHealthBar
+  m_EditorClassIdentifier: Assembly-CSharp::HealthBar
   fill: {fileID: 5710706675378389974}
 --- !u!1 &3527015948134085146
 GameObject:

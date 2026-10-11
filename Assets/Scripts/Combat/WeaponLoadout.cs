@@ -2,6 +2,8 @@
  * WeaponLoadout / IAimedWeapon
  * Lives on the weapon owner (the player) and coordinates all of its aimed weapons so they work as a team.
  *
+ * - Works on any Damageable category a weapon's stats allow (enemies, resources, ...). The close
+ *   range override only considers enemies, so a nearby tree never pulls guns off the threat list.
  * - Target priority (highest first):
  *     1. Enemies inside closeRange of the owner (a character-wide range, not tied to any weapon)
  *     2. Bosses
@@ -51,6 +53,7 @@ public interface IAimedWeapon
     float RingRadius { get; }
     float SeparationDistance { get; }
     Vector3 SlotDirection { get; }
+    bool CanTarget(TargetCategory category);
 }
 
 public class WeaponLoadout : MonoBehaviour
@@ -69,17 +72,17 @@ public class WeaponLoadout : MonoBehaviour
     private readonly bool[] pairUsed = new bool[MaxPairedWeapons];
     private readonly int[] currentPairing = new int[MaxPairedWeapons];
     private readonly int[] bestPairing = new int[MaxPairedWeapons];
-    private readonly Enemy[] pairResult = new Enemy[MaxPairedWeapons];
+    private readonly Damageable[] pairResult = new Damageable[MaxPairedWeapons];
     private readonly List<int> pairWeapons = new List<int>(MaxPairedWeapons);
     private float bestPairCost;
 
     private readonly List<IAimedWeapon> weapons = new List<IAimedWeapon>();
-    private readonly List<Enemy> targets = new List<Enemy>();
+    private readonly List<Damageable> targets = new List<Damageable>();
     private readonly List<float> angles = new List<float>();
-    private readonly HashSet<Enemy> taken = new HashSet<Enemy>();
-    private readonly Dictionary<IAimedWeapon, Enemy> lastTargets = new Dictionary<IAimedWeapon, Enemy>();
+    private readonly HashSet<Damageable> taken = new HashSet<Damageable>();
+    private readonly Dictionary<IAimedWeapon, Damageable> lastTargets = new Dictionary<IAimedWeapon, Damageable>();
 
-    private Enemy closeTarget;
+    private Damageable closeTarget;
     private int refreshedFrame = -1;
 
     public float CloseRange => closeRange;
@@ -117,7 +120,7 @@ public class WeaponLoadout : MonoBehaviour
         refreshedFrame = -1;
     }
 
-    public Enemy GetTarget(IAimedWeapon weapon)
+    public Damageable GetTarget(IAimedWeapon weapon)
     {
         Refresh();
         int index = weapons.IndexOf(weapon);
@@ -158,12 +161,12 @@ public class WeaponLoadout : MonoBehaviour
         targets.Clear();
         angles.Clear();
 
-        Enemy closeTarget = SelectCloseTarget();
+        Damageable closeTarget = SelectCloseTarget();
 
         for (int i = 0; i < weapons.Count; i++)
         {
             IAimedWeapon weapon = weapons[i];
-            Enemy target = closeTarget != null ? closeTarget : SelectTarget(weapon);
+            Damageable target = closeTarget != null ? closeTarget : SelectTarget(weapon);
 
             targets.Add(target);
             angles.Add(float.NaN);
@@ -182,7 +185,7 @@ public class WeaponLoadout : MonoBehaviour
         for (int i = 0; i < weapons.Count; i++)
         {
             IAimedWeapon weapon = weapons[i];
-            Enemy target = targets[i];
+            Damageable target = targets[i];
             lastTargets[weapon] = target;
 
             if (target == null)
@@ -226,7 +229,7 @@ public class WeaponLoadout : MonoBehaviour
 
             for (int b = 0; b < count; b++)
             {
-                Enemy candidate = targets[pairWeapons[b]];
+                Damageable candidate = targets[pairWeapons[b]];
 
                 if (!IsCandidate(weapon, candidate))
                 {
@@ -303,15 +306,20 @@ public class WeaponLoadout : MonoBehaviour
         }
     }
 
-    private Enemy SelectCloseTarget()
+    private Damageable SelectCloseTarget()
     {
         Vector3 origin = transform.position;
         float sqrClose = closeRange * closeRange;
-        Enemy best = null;
+        Damageable best = null;
 
-        for (int i = 0; i < Enemy.Active.Count; i++)
+        for (int i = 0; i < Damageable.All.Count; i++)
         {
-            Enemy enemy = Enemy.Active[i];
+            Damageable enemy = Damageable.All[i];
+            if (enemy.Category != TargetCategory.Enemy)
+            {
+                continue;
+            }
+
             Vector3 offset = enemy.transform.position - origin;
             offset.y = 0f;
 
@@ -332,28 +340,28 @@ public class WeaponLoadout : MonoBehaviour
         return closeTarget;
     }
 
-    private bool IsInCloseRange(Enemy enemy, Vector3 origin)
+    private bool IsInCloseRange(Damageable enemy, Vector3 origin)
     {
         Vector3 offset = enemy.transform.position - origin;
         offset.y = 0f;
         return offset.sqrMagnitude <= closeRange * closeRange;
     }
 
-    private Enemy SelectTarget(IAimedWeapon weapon)
+    private Damageable SelectTarget(IAimedWeapon weapon)
     {
         Vector3 origin = weapon.Owner.position;
 
-        Enemy previous;
+        Damageable previous;
         lastTargets.TryGetValue(weapon, out previous);
         bool keepPrevious = previous != null && previous.isActiveAndEnabled
             && IsCandidate(weapon, previous) && !taken.Contains(previous);
 
-        Enemy bestFree = null;
-        Enemy bestAny = null;
+        Damageable bestFree = null;
+        Damageable bestAny = null;
 
-        for (int i = 0; i < Enemy.Active.Count; i++)
+        for (int i = 0; i < Damageable.All.Count; i++)
         {
-            Enemy enemy = Enemy.Active[i];
+            Damageable enemy = Damageable.All[i];
             if (!IsCandidate(weapon, enemy))
             {
                 continue;
@@ -378,15 +386,20 @@ public class WeaponLoadout : MonoBehaviour
         return bestFree != null ? bestFree : bestAny;
     }
 
-    private bool IsCandidate(IAimedWeapon weapon, Enemy enemy)
+    private bool IsCandidate(IAimedWeapon weapon, Damageable enemy)
     {
+        if (!weapon.CanTarget(enemy.Category))
+        {
+            return false;
+        }
+
         Vector3 offset = enemy.transform.position - weapon.Owner.position;
         offset.y = 0f;
         float sqr = offset.sqrMagnitude;
         return sqr <= weapon.Range * weapon.Range || sqr <= closeRange * closeRange;
     }
 
-    private int TierOf(Enemy enemy, Vector3 origin)
+    private int TierOf(Damageable enemy, Vector3 origin)
     {
         Vector3 offset = enemy.transform.position - origin;
         offset.y = 0f;
@@ -394,7 +407,7 @@ public class WeaponLoadout : MonoBehaviour
         return offset.sqrMagnitude <= closeRange * closeRange ? tier + CloseTierBonus : tier;
     }
 
-    private bool IsBetter(Enemy candidate, Enemy current, Vector3 origin)
+    private bool IsBetter(Damageable candidate, Damageable current, Vector3 origin)
     {
         int candidateTier = TierOf(candidate, origin);
         int currentTier = TierOf(current, origin);

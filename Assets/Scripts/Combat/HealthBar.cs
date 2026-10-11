@@ -1,33 +1,33 @@
 /*
- * EnemyHealthBar
- * World-space health bar that floats above an enemy and faces the camera. Hidden until the enemy
- * has taken damage.
+ * HealthBar
+ * World-space health bar that floats above a damageable thing and faces the camera. Hidden until the
+ * target has taken damage. Works for enemies now and any other Damageable (trees, walls, ...) later.
  *
- * - Lives on a world-space Canvas that is a child of the enemy (same setup as StaminaBar).
- * - The Canvas component is disabled while the enemy is at full health, so unhurt enemies cost
- *   no canvas rendering or rebuilds. Pooled enemies reset to full health on enable, so the bar
+ * - Lives on a world-space Canvas that is a child of the Damageable (same setup as StaminaBar).
+ * - The Canvas component is disabled while the target is at full health, so unhurt targets cost
+ *   no canvas rendering or rebuilds. Pooled targets reset to full health on enable, so the bar
  *   hides again on reuse.
- * - The fill is a plain Image whose right anchor is scaled by Enemy.HealthNormalized, and it is
+ * - The fill is a plain Image whose right anchor is scaled by Damageable.HealthNormalized, and it is
  *   only touched when the value changes.
  * - Rotation is copied from the main camera each frame while visible so the bar reads flat on screen.
  */
 
 using UnityEngine;
 
-public class EnemyHealthBar : MonoBehaviour
+public class HealthBar : MonoBehaviour
 {
     private const float FullHealthThreshold = 0.999f;
 
     [SerializeField] private RectTransform fill;
 
-    private Enemy enemy;
+    private Damageable target;
     private Canvas canvas;
     private Camera cam;
     private float shownFraction = -1f;
 
     private void Awake()
     {
-        enemy = GetComponentInParent<Enemy>();
+        target = GetComponentInParent<Damageable>();
         canvas = GetComponent<Canvas>();
         cam = Camera.main;
         canvas.enabled = false;
@@ -41,12 +41,12 @@ public class EnemyHealthBar : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (enemy == null)
+        if (target == null)
         {
             return;
         }
 
-        float fraction = enemy.HealthNormalized;
+        float fraction = target.HealthNormalized;
         bool shouldShow = fraction < FullHealthThreshold;
 
         if (canvas.enabled != shouldShow)
