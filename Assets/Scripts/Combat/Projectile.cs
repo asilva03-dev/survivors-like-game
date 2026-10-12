@@ -8,8 +8,11 @@
  *   so the same projectile hurts enemies and resources by different amounts.
  * - Hits are detected with a SphereCast along each frame's movement, so fast projectiles
  *   do not tunnel through targets.
- * - SphereCast ignores colliders it starts inside, so Launch also checks for a target overlapping
- *   the spawn point and hits it immediately (point-blank shots).
+ * - SphereCast ignores colliders it starts inside, so Launch checks for a target overlapping the
+ *   spawn point (point-blank shots) and every Update checks for one overlapping the current position
+ *   before casting. The second matters because colliders only move to their new positions at the
+ *   physics step, so an enemy collider can land on a flying bullet between two casts; without the
+ *   overlap check that bullet would pass straight through the enemy.
  * - Only Damageable colliders take damage; the owner's own colliders are ignored.
  *   Hitting any other collider also returns the projectile to the pool.
  * - The trail is cleared on launch so a reused projectile does not streak from its old position.
@@ -92,6 +95,14 @@ public class Projectile : MonoBehaviour
 
     private void Update()
     {
+        // Colliders only jump to their new positions at the physics step, so one can land on the bullet
+        // between two casts; a cast ignores what it starts inside, so check the current position first.
+        if (HitOverlappingTarget())
+        {
+            pool.Release(this);
+            return;
+        }
+
         float step = speed * Time.deltaTime;
 
         if (Physics.SphereCast(transform.position, hitRadius, direction, out RaycastHit hit, step,

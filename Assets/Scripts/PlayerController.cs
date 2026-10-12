@@ -9,6 +9,7 @@
  *   speed ramps from moveSpeed to sprintMaxSpeed over sprintTimeToMax seconds while
  *   draining sprintStaminaDrain per second. Sprint ends on release or empty stamina.
  * - Dash direction is the current input, or the last moved direction if there is none.
+ * - MoveSpeedMultiplier slows walking and sprinting (set by the melee weapon while charging).
  * - Inputs are defined here with default bindings and can be edited in the inspector.
  */
 
@@ -47,6 +48,9 @@ public class PlayerController : MonoBehaviour
     private float sprintTime;
 
     public bool IsBoosting => mode != Mode.Normal;
+
+    // Scales walking and sprinting speed (not the dash); the melee weapon lowers it while charging.
+    public float MoveSpeedMultiplier { get; set; } = 1f;
 
     private void Reset()
     {
@@ -147,11 +151,11 @@ public class PlayerController : MonoBehaviour
 
             case Mode.Sprinting:
                 float t = Mathf.Clamp01(sprintTime / Mathf.Max(sprintTimeToMax, 0.01f));
-                targetVelocity = direction * Mathf.Lerp(moveSpeed, sprintMaxSpeed, t);
+                targetVelocity = direction * (Mathf.Lerp(moveSpeed, sprintMaxSpeed, t) * MoveSpeedMultiplier);
                 break;
 
             default:
-                targetVelocity = direction * moveSpeed;
+                targetVelocity = direction * (moveSpeed * MoveSpeedMultiplier);
                 break;
         }
     }

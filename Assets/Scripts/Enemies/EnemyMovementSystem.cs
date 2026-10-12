@@ -9,6 +9,7 @@
  * - A short hard pass then pushes apart any pair closer than minSpacing and keeps enemies outside
  *   stopDistance of the player, so enemies do not visibly overlap even in dense crowds.
  * - Speed and spacing come from the shared EnemySettings asset.
+ * - Knocked-back enemies (Enemy.Knockback) stop seeking and add their push step to the move.
  * - Enemies keep their own Y. They need a kinematic Rigidbody (cheap collider moves) and live on the
  *   "Enemy" layer, whose collisions with the default layer are disabled here so a crowd cannot trap
  *   the player. Projectile hit checks still see them.
@@ -103,11 +104,12 @@ public class EnemyMovementSystem : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
+            Enemy enemy = Enemy.Active[i];
             Vector2 toTarget = target - positions[i];
             float distance = toTarget.magnitude;
             Vector2 seek = Vector2.zero;
 
-            if (distance > settings.StopDistance && dt > 0f)
+            if (!enemy.IsKnockedBack && distance > settings.StopDistance && dt > 0f)
             {
                 float speed = Mathf.Min(settings.MoveSpeed, (distance - settings.StopDistance) / dt);
                 seek = toTarget / distance * speed;
@@ -132,7 +134,7 @@ public class EnemyMovementSystem : MonoBehaviour
             }
 
             push = Vector2.ClampMagnitude(push, 1f) * settings.SeparationStrength;
-            moved[i] = positions[i] + (seek + push) * dt;
+            moved[i] = positions[i] + (seek + push) * dt + enemy.TakeKnockbackStep(dt);
         }
     }
 
