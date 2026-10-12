@@ -2,19 +2,23 @@
  * WeaponLoadout / IAimedWeapon
  * Lives on the weapon owner (the player) and coordinates all of its aimed weapons so they work as a team.
  *
- * - Works on any Damageable category a weapon's stats allow (enemies, resources, ...). The close
- *   range override only considers enemies, so a nearby tree never pulls guns off the threat list.
+ * - Works on any Damageable category a weapon's stats allow (enemies, resources, ...).
+ * - Resources (trees, ...) are always the lowest tier: an enemy anywhere in reach (a weapon's range or
+ *   closeRange) beats a resource, even one inside closeRange. Resources only get the shared close-range
+ *   targeting below when no enemy is in reach.
  * - Target priority (highest first):
- *     1. Enemies inside closeRange of the owner (a character-wide range, not tied to any weapon)
+ *     1. Anything inside closeRange of the owner (a character-wide range, not tied to any weapon)
+ *        that every weapon in the loadout can target (enemies; resources only when no enemy is in reach)
  *     2. Bosses
  *     3. Elites
  *     4. Lowest current HP (absolute HP, not percentage)
  *     5. Closest to the owner
- *   The same order applies inside the close range, so a boss at the player's feet beats a minion.
- * - Close-range targets are shared: while any enemy is inside closeRange, ALL weapons attack the same
- *   top-priority enemy in it (no splitting), regardless of each weapon's own range. This target is
+ *   The same order applies inside the close range, so a boss at the player's feet beats a minion, and
+ *   an enemy always beats a tree standing next to it.
+ * - Close-range targets are shared: while anything is inside closeRange, ALL weapons attack the same
+ *   top-priority target in it (no splitting), regardless of each weapon's own range. This target is
  *   chosen once for the whole loadout and kept until it dies, leaves closeRange, or a higher tier
- *   enemy (boss or elite) enters closeRange.
+ *   target (boss or elite) enters closeRange.
  * - Otherwise a weapon can only target enemies inside its own range.
  * - Sticky targets: a weapon keeps its current target while it is alive, still targetable and not
  *   claimed by an earlier weapon, and switches only when an enemy of a strictly higher tier (close
@@ -60,6 +64,7 @@ public class WeaponLoadout : MonoBehaviour
 {
     private const int SpreadIterations = 4;
     private const int CloseTierBonus = 3;
+    private const int ResourceTier = -1;
     private const float HealthTieEpsilon = 0.01f;
     private const int MaxPairedWeapons = 5;
     private const float InvalidPairCost = 1000f;
@@ -161,7 +166,8 @@ public class WeaponLoadout : MonoBehaviour
         targets.Clear();
         angles.Clear();
 
-        Damageable closeTarget = SelectCloseTarget();
+        bool enemyInReach = AnyEnemyInReach();
+        Damageable closeTarget = SelectCloseTarget(enemyInReach);
 
         for (int i = 0; i < weapons.Count; i++)
         {
@@ -306,7 +312,29 @@ public class WeaponLoadout : MonoBehaviour
         }
     }
 
-    private Damageable SelectCloseTarget()
+    private bool AnyEnemyInReach()
+    {
+        for (int i = 0; i < Damageable.All.Count; i++)
+        {
+            Damageable candidate = Damageable.All[i];
+            if (candidate.Category == TargetCategory.Resource)
+            {
+                continue;
+            }
+
+            for (int w = 0; w < weapons.Count; w++)
+            {
+                if (IsCandidate(weapons[w], candidate))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private Damageable SelectCloseTarget(bool enemyInReach)
     {
         Vector3 origin = transform.position;
         float sqrClose = closeRange * closeRange;
@@ -315,7 +343,12 @@ public class WeaponLoadout : MonoBehaviour
         for (int i = 0; i < Damageable.All.Count; i++)
         {
             Damageable enemy = Damageable.All[i];
-            if (enemy.Category != TargetCategory.Enemy)
+            if (!AllWeaponsCanTarget(enemy.Category))
+            {
+                continue;
+            }
+
+            if (enemyInReach && enemy.Category == TargetCategory.Resource)
             {
                 continue;
             }
@@ -330,6 +363,7 @@ public class WeaponLoadout : MonoBehaviour
         }
 
         bool keepCurrent = closeTarget != null && closeTarget.isActiveAndEnabled && IsInCloseRange(closeTarget, origin)
+            && !(enemyInReach && closeTarget.Category == TargetCategory.Resource)
             && (best == null || TierOf(best, origin) <= TierOf(closeTarget, origin));
 
         if (!keepCurrent)
@@ -338,6 +372,19 @@ public class WeaponLoadout : MonoBehaviour
         }
 
         return closeTarget;
+    }
+
+    private bool AllWeaponsCanTarget(TargetCategory category)
+    {
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            if (!weapons[i].CanTarget(category))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private bool IsInCloseRange(Damageable enemy, Vector3 origin)
@@ -378,6 +425,15 @@ public class WeaponLoadout : MonoBehaviour
             }
         }
 
+        bool resourceFreeButEnemyTaken = bestFree != null && bestFree.Category == TargetCategory.Resource
+            && bestAny != null && bestAny.Category != TargetCategory.Resource;
+        if (resourceFreeButEnemyTaken)
+        {
+            // share the enemy another weapon already took instead of settling for a tree
+            bestFree = null;
+            keepPrevious = keepPrevious && previous.Category != TargetCategory.Resource;
+        }
+
         if (keepPrevious && (bestFree == null || TierOf(bestFree, origin) <= TierOf(previous, origin)))
         {
             return previous;
@@ -401,6 +457,11 @@ public class WeaponLoadout : MonoBehaviour
 
     private int TierOf(Damageable enemy, Vector3 origin)
     {
+        if (enemy.Category == TargetCategory.Resource)
+        {
+            return ResourceTier;
+        }
+
         Vector3 offset = enemy.transform.position - origin;
         offset.y = 0f;
         int tier = (int)enemy.Rank;

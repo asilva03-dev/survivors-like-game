@@ -6,6 +6,9 @@
  * - category says what kind of thing this is. Weapon stats pick which categories they target and how
  *   much damage they deal to each (see WeaponStats.DamageFor).
  * - rank (Normal / Elite / Boss) feeds target priority in WeaponLoadout.
+ * - AimPoint is where projectiles are aimed: the transform position plus a world-space aimOffset.
+ *   Things whose pivot is at their base (trees, walls) set aimOffset up to gun height so bullets fly
+ *   level instead of diving into the ground before reaching them.
  * - All holds every enabled Damageable so systems never need scene searches. Health resets to full
  *   in OnEnable, so pooled objects come back healthy.
  * - Damaged (target, amount) fires on every hit, before death is handled, so killing blows are
@@ -50,10 +53,11 @@ public class Damageable : MonoBehaviour, IDamageable
     [SerializeField] private float maxHealth = 30f;
     [SerializeField] private TargetCategory category = TargetCategory.Enemy;
     [SerializeField] private TargetRank rank = TargetRank.Normal;
+    [SerializeField] private Vector3 aimOffset;
 
     private float health;
 
-    public Vector3 AimPoint => transform.position;
+    public Vector3 AimPoint => transform.position + aimOffset;
     public float Health => health;
     public float MaxHealth => maxHealth;
     public float HealthNormalized => maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
