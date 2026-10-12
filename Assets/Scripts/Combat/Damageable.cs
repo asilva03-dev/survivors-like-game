@@ -6,6 +6,7 @@
  * - category says what kind of thing this is. Weapon stats pick which categories they target and how
  *   much damage they deal to each (see WeaponStats.DamageFor).
  * - rank (Normal / Elite / Boss) feeds target priority in WeaponLoadout.
+ * - damageNumberColor is the text color of this entity's floating damage numbers (set per prefab).
  * - AimPoint is where projectiles are aimed: the transform position plus a world-space aimOffset.
  *   Things whose pivot is at their base (trees, walls) set aimOffset up to gun height so bullets fly
  *   level instead of diving into the ground before reaching them.
@@ -54,10 +55,12 @@ public class Damageable : MonoBehaviour, IDamageable
     [SerializeField] private TargetCategory category = TargetCategory.Enemy;
     [SerializeField] private TargetRank rank = TargetRank.Normal;
     [SerializeField] private Vector3 aimOffset;
+    [SerializeField] private Color damageNumberColor = Color.white;
 
     private float health;
 
     public Vector3 AimPoint => transform.position + aimOffset;
+    public Color DamageNumberColor => damageNumberColor;
     public float Health => health;
     public float MaxHealth => maxHealth;
     public float HealthNormalized => maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;

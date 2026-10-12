@@ -6,7 +6,8 @@
  *   positioned directly in world space.
  * - Listens to Damageable.Damaged, so enemies, trees and anything else damageable all show numbers.
  *   Each number appears at the target's position plus heightOffset, at a
- *   random point within spawnRadius, so rapid hits do not stack on one spot.
+ *   random point within spawnRadius, so rapid hits do not stack on one spot. Text color comes from
+ *   the target's Damageable.DamageNumberColor.
  * - Numbers come from a ComponentPool<DamageNumber> built from numberPrefab (prewarmed); the pool
  *   grows if many hits land at once.
  * - All look, timing, motion and pop values live in the serialized style and apply to every number.
@@ -38,6 +39,6 @@ public class DamageNumberSpawner : MonoBehaviour
         Vector3 position = target.transform.position + new Vector3(offset.x, style.heightOffset, offset.y);
 
         DamageNumber number = pool.Get(position, Quaternion.identity);
-        number.Show(pool, style, position, Mathf.Max(1, Mathf.RoundToInt(amount)).ToString());
+        number.Show(pool, style, position, Mathf.Max(1, Mathf.RoundToInt(amount)).ToString(), target.DamageNumberColor);
     }
 }

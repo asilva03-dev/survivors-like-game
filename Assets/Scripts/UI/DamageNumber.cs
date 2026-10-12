@@ -3,8 +3,11 @@
  * One pooled floating damage number, plus the shared style values that drive every number.
  *
  * - DamageNumberStyle is serialized on DamageNumberSpawner and read by every number each frame, so
- *   timing, scale and fade values can be tweaked live in Play mode. Text color, font size and outline
- *   size are applied when a number is shown.
+ *   timing, scale and fade values can be tweaked live in Play mode. Font size and outline size are
+ *   applied when a number is shown; the text color is passed per number (the target's Damageable
+ *   color).
+ * - The label uses the DamageNumberOnTop material (ZTest Always) so numbers draw over trees and
+ *   other geometry instead of being hidden behind it.
  * - Motion: rises riseDistance over lifetime with an ease-out. Scale starts at startScale, grows to
  *   popScale over popDuration, then settles to 1 over settleDuration. Alpha holds at 1, then fades to
  *   0 over the last fadeDuration seconds.
@@ -20,7 +23,6 @@ using UnityEngine.UI;
 public class DamageNumberStyle
 {
     [Header("Look")]
-    public Color textColor = Color.white;
     public Color outlineColor = Color.black;
     [Min(1)] public int fontSize = 40;
     [Min(0f)] public float outlineSize = 2f;
@@ -52,18 +54,20 @@ public class DamageNumber : MonoBehaviour
     private DamageNumberStyle style;
     private Camera cam;
     private Vector3 origin;
+    private Color color;
     private float age;
 
-    public void Show(ComponentPool<DamageNumber> owningPool, DamageNumberStyle numberStyle, Vector3 position, string value)
+    public void Show(ComponentPool<DamageNumber> owningPool, DamageNumberStyle numberStyle, Vector3 position, string value, Color textColor)
     {
         pool = owningPool;
         style = numberStyle;
         origin = position;
+        color = textColor;
         age = 0f;
 
         label.text = value;
         label.fontSize = style.fontSize;
-        label.color = style.textColor;
+        label.color = color;
         outline.effectColor = style.outlineColor;
         outline.effectDistance = new Vector2(style.outlineSize, -style.outlineSize);
 
@@ -105,9 +109,9 @@ public class DamageNumber : MonoBehaviour
             ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(fadeStart, style.lifetime, age))
             : 1f;
 
-        Color color = style.textColor;
-        color.a *= alpha;
-        label.color = color;
+        Color faded = color;
+        faded.a *= alpha;
+        label.color = faded;
 
         Color border = style.outlineColor;
         border.a *= alpha;

@@ -7,8 +7,9 @@
  *   chargeTime does the charged swing (more damage, pushes enemies away, costs more stamina). The swing
  *   direction is read from the cursor at the moment of release (ray onto the owner's ground plane), so
  *   the player can keep aiming while charging.
- * - Stamina is spent on release. A charged swing without enough stamina downgrades to a normal one;
- *   without stamina for that too, nothing happens except StaminaBar.PlayDeniedFeedback (shake + red flash).
+ * - Stamina is spent on release. A full charge without enough stamina for the charged swing does not
+ *   fall back to a normal swing: nothing happens except StaminaBar.PlayDeniedFeedback (shake + red
+ *   flash). Same for a normal release without stamina for a normal swing.
  * - Attack speed: releasing a swing locks out Mouse 1 for attackInterval (normal) or
  *   chargedAttackInterval (charged) seconds, counted from the release. Presses during the lockout are
  *   ignored, not buffered. A failed attempt (no stamina) does not start a lockout.
@@ -147,13 +148,9 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         aimYaw = Mathf.Atan2(aim.x, aim.z) * Mathf.Rad2Deg;
 
         bool full = chargeElapsed >= Stats.ChargeTime;
-        if (full && stamina.TrySpend(Stats.ChargedStaminaCost))
+        if (full ? stamina.TrySpend(Stats.ChargedStaminaCost) : stamina.TrySpend(Stats.StaminaCost))
         {
-            strongSwing = true;
-        }
-        else if (stamina.TrySpend(Stats.StaminaCost))
-        {
-            strongSwing = false;
+            strongSwing = full;
         }
         else
         {
