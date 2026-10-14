@@ -10,6 +10,8 @@
  *   Instantiate/Destroy at runtime.
  * - When a tree dies (Damageable.Died) it is released and a stump takes its spot. Stumps persist until
  *   the next SpawnAll() / ClearAll(), i.e. the next resource round; trees never regrow on their own.
+ * - A dying tree also plays a pooled DebrisBurst (falling green/brown chips) at its base, if
+ *   debrisPrefab is assigned.
  * - Each tree gets a random yaw and a scale within scaleRange of its prefab scale; its stump copies it.
  */
 
@@ -22,6 +24,7 @@ public class TreeSpawner : MonoBehaviour
 
     [SerializeField] private ResourceTree treePrefab;
     [SerializeField] private Transform stumpPrefab;
+    [SerializeField] private DebrisBurst debrisPrefab;
     [SerializeField] private bool spawnOnStart = true;
     [SerializeField, Min(1)] private int treeCount = 25;
     [SerializeField, Min(1f)] private float areaRadius = 40f;
@@ -35,12 +38,18 @@ public class TreeSpawner : MonoBehaviour
 
     private ComponentPool<ResourceTree> treePool;
     private ComponentPool<Transform> stumpPool;
+    private ComponentPool<DebrisBurst> debrisPool;
 
     private void Awake()
     {
         Transform root = new GameObject("Trees").transform;
         treePool = new ComponentPool<ResourceTree>(treePrefab, root, treeCount);
         stumpPool = new ComponentPool<Transform>(stumpPrefab, root, treeCount);
+
+        if (debrisPrefab != null)
+        {
+            debrisPool = new ComponentPool<DebrisBurst>(debrisPrefab, root, 4);
+        }
     }
 
     private void OnEnable() => Damageable.Died += HandleDied;
@@ -145,5 +154,10 @@ public class TreeSpawner : MonoBehaviour
         body.localScale = stumpPrefab.localScale * (scale.x / treePrefab.transform.localScale.x);
 
         stumps.Add(body);
+
+        if (debrisPool != null)
+        {
+            debrisPool.Get(position, Quaternion.identity).Play(debrisPool);
+        }
     }
 }

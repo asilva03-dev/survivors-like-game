@@ -226,7 +226,7 @@ MonoBehaviour:
   aimOffset: {x: 0, y: 1, z: 0}
   damageNumberColor: {r: 0.65, g: 0.4, b: 0.18, a: 1}
   leaves: {fileID: 86029584940142398}
-  woodYield: 5
+  woodYield: 15
   wobbleRotation: {x: 5, y: 0, z: 5}
   wobbleScale: {x: 0.04, y: 0.04, z: 0.04}
   wobbleDuration: 0.45

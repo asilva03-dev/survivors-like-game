@@ -40,8 +40,15 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
     private bool transitioning;
 
     public Vector3 SlotDirection => slotDirection;
+
+    // The target the shared targeting currently gives this weapon (same source Tick uses).
+    protected Damageable CurrentTarget => loadout != null
+        ? loadout.GetTarget(this)
+        : Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets);
     public float RingRadius => Stats.RingRadius;
     public float SeparationDistance => Stats.SeparationDistance;
+
+    public bool FocusWeakestResource => Stats.FocusWeakestResource;
 
     public bool CanTarget(TargetCategory category)
     {

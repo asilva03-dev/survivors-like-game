@@ -8,7 +8,7 @@
  * - color is the floor fill of the zone, alpha included (0.6 = 60% opacity).
  * - flashDuration is how long (seconds) the zone brightens after each attack so ticks are readable;
  *   0 disables it.
- * - attacksPerSecond and damage come from WeaponStats; each attack deals damage once per target.
+ * - attackInterval and damage come from WeaponStats; each attack deals damage once per target.
  */
 
 using UnityEngine;

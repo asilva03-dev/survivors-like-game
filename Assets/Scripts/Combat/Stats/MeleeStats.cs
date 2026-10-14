@@ -4,9 +4,9 @@
  * Create via Assets > Create > Weapons > Melee Stats.
  *
  * - Every number that shapes the attack lives here and applies live, including during Play mode.
- * - damage / resourceDamage / targets come from WeaponStats: damage is what a swing deals to enemies,
- *   resourceDamage to resources (trees, ...). attacksPerSecond from the base is NOT used by melee;
- *   attack speed is the two intervals below.
+ * - damage / resourceDamageMultiplier / targets come from WeaponStats: damage is what a swing deals to
+ *   enemies, damage x resourceDamageMultiplier (rounded up) to resources (trees, ...). attackInterval
+ *   (also from WeaponStats) is the normal swing's lockout.
  * - attackInterval / chargedAttackInterval: seconds after a swing is released during which Mouse 1
  *   is ignored (no new charge can start; a button held through it does nothing until pressed again).
  *   The timer starts at release, so it is the full time between one attack and the next; a swing still
@@ -19,13 +19,20 @@
  * - Charged attack: hold until chargeTime seconds have passed, then release. It uses its own
  *   chargedSwingDuration and chargedStaminaCost, multiplies damage by chargedDamageMultiplier and pushes
  *   enemies away knockbackDistance units over knockbackDuration seconds. If the stamina for it is
- *   missing it falls back to a normal attack.
+ *   missing nothing happens (no fallback to a normal attack).
+ * - Hit stop: when a swing hits a resource (tree) the swing animation freezes for hitStopDuration
+ *   (normal) or chargedHitStopDuration (charged) seconds. The attack lockout is pushed back by the
+ *   same time so attack spacing is unchanged.
  * - chargeMoveSpeedMultiplier scales player move speed while charging (1 = no slowdown).
  * - swingCurve maps swing time (0..1) to arc progress (0..1) for easing. The default starts at a normal
  *   pace, speeds up through the strike, then eases out slowly as the swing finishes.
  * - extensionCurve maps swing time (0..1) to an extension amount (0..1) that goes out and comes back:
  *   the axe is pushed extendDistance units farther from the owner (hits reach that far too) and grows
  *   by growAmount (0.3 = 30% bigger) at the curve's peak, then returns to normal by the end.
+ * - tiltCurve maps swing time (0..1) to a multiplier on tiltAngle (degrees): the model rotates about its
+ *   own center around tiltAxis (in pivot space: X = pitch the handle up/down, Z = roll the blade,
+ *   Y = yaw). Default starts cocked back (1), snaps past neutral (-0.3) at the strike and settles to
+ *   0. Flip tiltAngle's sign to tilt the other way.
  */
 
 using UnityEngine;
@@ -41,7 +48,6 @@ public class MeleeStats : WeaponStats
     [Header("Normal attack")]
     [SerializeField, Min(0.02f)] private float swingDuration = 0.25f;
     [SerializeField, Min(0f)] private float staminaCost = 15f;
-    [SerializeField, Min(0f)] private float attackInterval = 0.3f;
 
     [Header("Charged attack")]
     [SerializeField, Min(0.05f)] private float chargeTime = 0.6f;
@@ -51,6 +57,10 @@ public class MeleeStats : WeaponStats
     [SerializeField, Min(0f)] private float chargedDamageMultiplier = 1.5f;
     [SerializeField, Min(0f)] private float knockbackDistance = 2f;
     [SerializeField, Min(0.02f)] private float knockbackDuration = 0.25f;
+
+    [Header("Hit stop (resources)")]
+    [SerializeField, Min(0f)] private float hitStopDuration = 0.06f;
+    [SerializeField, Min(0f)] private float chargedHitStopDuration = 0.12f;
 
     [Header("Charging")]
     [SerializeField, Range(0.05f, 1f)] private float chargeMoveSpeedMultiplier = 0.6f;
@@ -64,6 +74,12 @@ public class MeleeStats : WeaponStats
         new Keyframe(0f, 0f, 0f, 0f),
         new Keyframe(0.45f, 1f, 0f, 0f),
         new Keyframe(1f, 0f, 0f, 0f));
+    [SerializeField] private float tiltAngle = 40f;
+    [SerializeField] private Vector3 tiltAxis = Vector3.right;
+    [SerializeField] private AnimationCurve tiltCurve = new AnimationCurve(
+        new Keyframe(0f, 1f, 0f, 0f),
+        new Keyframe(0.45f, -0.3f, 0f, 0f),
+        new Keyframe(1f, 0f, 0f, 0f));
     [SerializeField, Min(0f)] private float extendDistance = 1.2f;
     [SerializeField, Min(0f)] private float growAmount = 0.3f;
 
@@ -73,7 +89,6 @@ public class MeleeStats : WeaponStats
     public float TargetRadius => targetRadius;
     public float SwingDuration => swingDuration;
     public float StaminaCost => staminaCost;
-    public float AttackInterval => attackInterval;
     public float ChargedAttackInterval => chargedAttackInterval;
     public float ChargeTime => chargeTime;
     public float ChargedSwingDuration => chargedSwingDuration;
@@ -81,9 +96,14 @@ public class MeleeStats : WeaponStats
     public float ChargedDamageMultiplier => chargedDamageMultiplier;
     public float KnockbackDistance => knockbackDistance;
     public float KnockbackDuration => knockbackDuration;
+    public float HitStopDuration => hitStopDuration;
+    public float ChargedHitStopDuration => chargedHitStopDuration;
     public float ChargeMoveSpeedMultiplier => chargeMoveSpeedMultiplier;
     public AnimationCurve SwingCurve => swingCurve;
     public AnimationCurve ExtensionCurve => extensionCurve;
+    public float TiltAngle => tiltAngle;
+    public Vector3 TiltAxis => tiltAxis;
+    public AnimationCurve TiltCurve => tiltCurve;
     public float ExtendDistance => extendDistance;
     public float GrowAmount => growAmount;
 }

@@ -1,6 +1,15 @@
 /*
  * Projectile
- * Pooled straight-line projectile. Flies toward where the target was when fired (no homing).
+ * Pooled projectile. Normally flies straight toward where the target was when fired; homing is opt-in
+ * per gun (GunStats.homing / homingStrength).
+ * Extra bullets of a multi-shot (GunStats.projectileCount > 3) are launched angled away from the aim
+ * and turn back to the aim direction at a fixed rate (an arc at the start), then fly straight.
+ * Homing bullets (every bullet of a homing gun, including the curving ones) skip the fixed settle
+ * heading and steer at the target from launch. If the target dies mid-flight they ask the firing
+ * weapon (retarget callback = the loadout's current target for that weapon) for a new one. They give
+ * up for good only after they have lined up on the target and then flown past it.
+ * Pierce (GunStats.pierce): a bullet survives that many damageable hits and is released on the next;
+ * each target is hit at most once per bullet. Non-damageable colliders still stop it.
  *
  * - Never created or destroyed at runtime: the weapon's ComponentPool owns it. Launch()
  *   fully resets state and the pool returns it with Release() on hit or when lifetime ends.
@@ -35,10 +44,33 @@ public class Projectile : MonoBehaviour
     private float speed;
     private float lifetime;
     private float age;
+    private Vector3 finalDirection;
+    private float steerSpeed;
+    private bool steering;
+    private Damageable homingTarget;
+    private float homingSpeed;
+    private bool homingActive;
+    private bool homingAcquired;
+    private System.Func<Damageable> retarget;
+    private int piercesLeft;
+    private readonly System.Collections.Generic.List<Damageable> hitTargets = new System.Collections.Generic.List<Damageable>();
 
     public void Launch(ComponentPool<Projectile> owningPool, Vector3 travelDirection, float travelSpeed,
-        WeaponStats weaponStats, float maxLifetime, Transform ignore)
+        WeaponStats weaponStats, float maxLifetime, Transform ignore,
+        Vector3? settleDirection = null, float steerDegreesPerSecond = 0f,
+        Damageable homeOn = null, float homingDegreesPerSecond = 0f, System.Func<Damageable> retargetCallback = null,
+        int pierce = 0)
     {
+        piercesLeft = Mathf.Max(0, pierce);
+        hitTargets.Clear();
+        homingActive = homingDegreesPerSecond > 0f && homeOn != null;
+        homingTarget = homingActive ? homeOn : null;
+        homingSpeed = homingDegreesPerSecond;
+        homingAcquired = false;
+        retarget = homingActive ? retargetCallback : null;
+        steerSpeed = steerDegreesPerSecond;
+        finalDirection = settleDirection.GetValueOrDefault();
+        steering = !homingActive && settleDirection.HasValue && steerSpeed > 0f;
         pool = owningPool;
         direction = travelDirection;
         speed = travelSpeed;
@@ -74,13 +106,107 @@ public class Projectile : MonoBehaviour
             }
 
             Damageable target = other.GetComponentInParent<Damageable>();
-            if (target != null)
+            if (target != null && !hitTargets.Contains(target))
             {
-                Hit(target);
-                return true;
+                if (HitAndCheckDone(target))
+                {
+                    return true;
+                }
             }
         }
 
+        return false;
+    }
+
+    // Curving projectiles (extra bullets of a multi-shot) are launched angled away from the aim and
+    // turn back to the aim direction at a fixed rate. It is an opening arc only: once the bullet
+    // points along the aim direction it keeps that heading and flies dead straight.
+    private void SteerToHeading()
+    {
+        if (!steering)
+        {
+            Home();
+            return;
+        }
+
+        direction = Vector3.RotateTowards(direction, finalDirection, steerSpeed * Mathf.Deg2Rad * Time.deltaTime, 0f);
+        transform.rotation = Quaternion.LookRotation(direction);
+
+        if (Vector3.Angle(direction, finalDirection) < 0.1f)
+        {
+            direction = finalDirection;
+            steering = false;
+        }
+    }
+
+    // Optional homing (GunStats.homing): turn toward the target's current position at a limited rate.
+    // A dead target is replaced by the firing weapon's current target. A bullet that was lined up on
+    // its target (within 90 degrees) and then ends up facing away from it has flown past: it gives up
+    // for good so misses fly off instead of orbiting. Bullets launched angled away start unacquired
+    // and keep turning in until they line up.
+    private void Home()
+    {
+        if (!homingActive)
+        {
+            return;
+        }
+
+        if (homingTarget != null && (!homingTarget.isActiveAndEnabled || hitTargets.Contains(homingTarget)))
+        {
+            homingTarget = null;
+            homingAcquired = false;
+        }
+
+        if (homingTarget == null && retarget != null)
+        {
+            homingTarget = retarget();
+            if (homingTarget != null && hitTargets.Contains(homingTarget))
+            {
+                homingTarget = null;
+            }
+        }
+
+        if (homingTarget == null)
+        {
+            return;
+        }
+
+        Vector3 wanted = homingTarget.AimPoint - transform.position;
+        if (wanted.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        wanted.Normalize();
+        float angle = Vector3.Angle(direction, wanted);
+        if (angle <= 90f)
+        {
+            homingAcquired = true;
+        }
+        else if (homingAcquired)
+        {
+            homingActive = false;
+            homingTarget = null;
+            return;
+        }
+
+        direction = Vector3.RotateTowards(direction, wanted, homingSpeed * Mathf.Deg2Rad * Time.deltaTime, 0f);
+        transform.rotation = Quaternion.LookRotation(direction);
+    }
+
+    // Deals damage and remembers the target so a piercing bullet never hits it twice.
+    // Returns true when the bullet has no pierces left and must be released.
+    private bool HitAndCheckDone(Damageable target)
+    {
+        Hit(target);
+
+        if (piercesLeft <= 0)
+        {
+            return true;
+        }
+
+        piercesLeft--;
+        hitTargets.Add(target);
         return false;
     }
 
@@ -103,6 +229,8 @@ public class Projectile : MonoBehaviour
             return;
         }
 
+        SteerToHeading();
+
         float step = speed * Time.deltaTime;
 
         if (Physics.SphereCast(transform.position, hitRadius, direction, out RaycastHit hit, step,
@@ -112,13 +240,14 @@ public class Projectile : MonoBehaviour
             if (!isOwner)
             {
                 Damageable target = hit.collider.GetComponentInParent<Damageable>();
-                if (target != null)
+                if (target == null || !hitTargets.Contains(target))
                 {
-                    Hit(target);
+                    if (target == null || HitAndCheckDone(target))
+                    {
+                        pool.Release(this);
+                        return;
+                    }
                 }
-
-                pool.Release(this);
-                return;
             }
         }
 

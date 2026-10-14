@@ -7,9 +7,11 @@
  *   instead of holding their own numbers, so adding a weapon variant is just a new asset.
  * - Range is the weapon's reach from its owner. Each subclass defines the serialized value (a gun's
  *   range, an AOE's radius) so inspector labels match what the number means.
- * - attacksPerSecond is the generic attack rate; for interval-based weapons use 1 / interval.
- * - Damage is per target category: damage is what the weapon deals to enemies, resourceDamage to
- *   resources (trees, stone, ...). Structures and the player are never damaged by weapons.
+ * - attackInterval is the seconds between attacks (lower = faster). Guns and AOE use it as their
+ *   cooldown; melee uses it as the lockout after a normal swing.
+ * - Damage is per target category: damage is what the weapon deals to enemies; resources (trees,
+ *   stone, ...) take damage x resourceDamageMultiplier rounded up to a whole number, so later damage
+ *   buffs scale resource damage consistently. Structures and the player are never damaged by weapons.
  *   DamageFor(category) returns 0 for any category not in targets.
  * - targets is which categories the weapon will aim at and hurt (enemies and resources by default).
  * - Edits to an asset apply live to every weapon using it, including during Play mode.
@@ -19,15 +21,22 @@ using UnityEngine;
 
 public abstract class WeaponStats : ScriptableObject
 {
-    [SerializeField, Min(0.01f)] private float attacksPerSecond = 2.5f;
+    [SerializeField, Min(0.01f)] private float attackInterval = 0.4f;
     [SerializeField] private float damage = 10f;
-    [SerializeField, Min(0f)] private float resourceDamage = 2f;
+    [SerializeField, Min(0f)] private float resourceDamageMultiplier = 1f;
     [SerializeField] private TargetMask targets = TargetMask.Enemy | TargetMask.Resource;
 
     public abstract float Range { get; }
-    public float AttacksPerSecond => attacksPerSecond;
+    public float AttackInterval => attackInterval;
     public float Damage => damage;
-    public float ResourceDamage => resourceDamage;
+    public float ResourceDamageMultiplier => resourceDamageMultiplier;
+    public float ResourceDamage => ResourceDamageFor(damage);
+
+    // Damage dealt to resources for a given enemy damage value, rounded up to a whole number.
+    public float ResourceDamageFor(float baseDamage)
+    {
+        return Mathf.Ceil(baseDamage * resourceDamageMultiplier - 0.0001f);
+    }
     public TargetMask Targets => targets;
 
     public bool CanTarget(TargetCategory category)
@@ -47,7 +56,7 @@ public abstract class WeaponStats : ScriptableObject
             case TargetCategory.Enemy:
                 return damage;
             case TargetCategory.Resource:
-                return resourceDamage;
+                return ResourceDamageFor(damage);
             default:
                 return 0f;
         }

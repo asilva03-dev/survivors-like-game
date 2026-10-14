@@ -11,10 +11,17 @@
  *        that every weapon in the loadout can target (enemies; resources only when no enemy is in reach)
  *     2. Bosses
  *     3. Elites
- *     4. Lowest current HP (absolute HP, not percentage)
+ *     4. Lowest current HP (absolute HP; among resources: lowest health percentage, see below)
  *     5. Closest to the owner
  *   The same order applies inside the close range, so a boss at the player's feet beats a minion, and
  *   an enemy always beats a tree standing next to it.
+ * - Weapons whose stats set focusWeakestResource (the throwable; not guns, which spread over targets)
+ *   add a rule for resources only: among resources in reach they pick the LOWEST HEALTH PERCENTAGE
+ *   (not absolute HP), they may share a resource another weapon already took (guns spread out, so
+ *   the weak tree is usually "taken" by a gun), and a weapon already on a resource switches to one
+ *   that is lower by at least ResourceSwitchMargin (5% of max health) so it does not stick forever
+ *   or flicker between equal trees. Enemy targeting and the shared close target are unchanged. Such
+ *   weapons are left out of the side pairing below, so they never pull a gun off its target.
  * - Close-range targets are shared: while anything is inside closeRange, ALL weapons attack the same
  *   top-priority target in it (no splitting), regardless of each weapon's own range. This target is
  *   chosen once for the whole loadout and kept until it dies, leaves closeRange, or a higher tier
@@ -40,9 +47,8 @@
  *   so weapons do not swap sides or cross over.
  * - Weapons keep facing their real target from wherever they sit, so spread-out guns tilt inward.
  * - TryAddWeapon(prefab) spawns a weapon as a child of the owner mid-run (used by WeaponPickup) and
- *   fails only for aimed weapons (guns, later melee) when the loadout already holds
- *   maxAimedWeapons of them. Other weapon types (AOE, ...) are not capped yet and just run on their
- *   own; aimed weapons register themselves.
+ *   fails only for guns when the loadout already holds maxGuns of them (2). Every other weapon type
+ *   (ThrowL, AOE, ...) has no limit; aimed ones register themselves.
  * - Results are computed once per frame on first request, so script execution order does not matter.
  * - AimedWeapon registers itself automatically in OnEnable if a WeaponLoadout is on a parent.
  */
@@ -58,6 +64,7 @@ public interface IAimedWeapon
     float SeparationDistance { get; }
     Vector3 SlotDirection { get; }
     bool CanTarget(TargetCategory category);
+    bool FocusWeakestResource { get; }
 }
 
 public class WeaponLoadout : MonoBehaviour
@@ -66,12 +73,14 @@ public class WeaponLoadout : MonoBehaviour
     private const int CloseTierBonus = 3;
     private const int ResourceTier = -1;
     private const float HealthTieEpsilon = 0.01f;
+    private const float ResourceSwitchMargin = 0.05f;
     private const int MaxPairedWeapons = 5;
     private const float InvalidPairCost = 1000f;
 
     [SerializeField, Min(0f)] private float closeRange = 3f;
     [SerializeField, Min(0f)] private float pairingThreshold = 20f;
-    [SerializeField, Min(1)] private int maxAimedWeapons = 2;
+    [SerializeField, Min(1), UnityEngine.Serialization.FormerlySerializedAs("maxAimedWeapons")]
+    private int maxGuns = 2;
 
     private readonly float[,] pairCost = new float[MaxPairedWeapons, MaxPairedWeapons];
     private readonly bool[] pairUsed = new bool[MaxPairedWeapons];
@@ -99,14 +108,27 @@ public class WeaponLoadout : MonoBehaviour
             return false;
         }
 
-        bool isAimed = weaponPrefab.GetComponent<IAimedWeapon>() != null;
-        if (isAimed && weapons.Count >= maxAimedWeapons)
+        if (weaponPrefab.GetComponent<GunWeapon>() != null && CountGuns() >= maxGuns)
         {
             return false;
         }
 
         Instantiate(weaponPrefab, transform);
         return true;
+    }
+
+    private int CountGuns()
+    {
+        int count = 0;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            if (weapons[i] is GunWeapon)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     public void Register(IAimedWeapon weapon)
@@ -215,7 +237,7 @@ public class WeaponLoadout : MonoBehaviour
         pairWeapons.Clear();
         for (int i = 0; i < weapons.Count; i++)
         {
-            if (targets[i] != null)
+            if (targets[i] != null && !weapons[i].FocusWeakestResource)
             {
                 pairWeapons.Add(i);
             }
@@ -400,8 +422,9 @@ public class WeaponLoadout : MonoBehaviour
 
         Damageable previous;
         lastTargets.TryGetValue(weapon, out previous);
+        bool focus = weapon.FocusWeakestResource;
         bool keepPrevious = previous != null && previous.isActiveAndEnabled
-            && IsCandidate(weapon, previous) && !taken.Contains(previous);
+            && IsCandidate(weapon, previous) && (!taken.Contains(previous) || IsSharedResource(focus, previous));
 
         Damageable bestFree = null;
         Damageable bestAny = null;
@@ -414,12 +437,13 @@ public class WeaponLoadout : MonoBehaviour
                 continue;
             }
 
-            if (!taken.Contains(enemy) && (bestFree == null || IsBetter(enemy, bestFree, origin)))
+            if ((!taken.Contains(enemy) || IsSharedResource(focus, enemy))
+                && (bestFree == null || IsBetter(enemy, bestFree, origin, focus)))
             {
                 bestFree = enemy;
             }
 
-            if (bestAny == null || IsBetter(enemy, bestAny, origin))
+            if (bestAny == null || IsBetter(enemy, bestAny, origin, focus))
             {
                 bestAny = enemy;
             }
@@ -434,7 +458,8 @@ public class WeaponLoadout : MonoBehaviour
             keepPrevious = keepPrevious && previous.Category != TargetCategory.Resource;
         }
 
-        if (keepPrevious && (bestFree == null || TierOf(bestFree, origin) <= TierOf(previous, origin)))
+        if (keepPrevious && (bestFree == null || TierOf(bestFree, origin) <= TierOf(previous, origin))
+            && !(focus && IsWeakerResource(bestFree, previous)))
         {
             return previous;
         }
@@ -468,7 +493,22 @@ public class WeaponLoadout : MonoBehaviour
         return offset.sqrMagnitude <= closeRange * closeRange ? tier + CloseTierBonus : tier;
     }
 
-    private bool IsBetter(Damageable candidate, Damageable current, Vector3 origin)
+    // True when both are resources and the candidate is lower in health percentage by the switch margin.
+    private static bool IsWeakerResource(Damageable candidate, Damageable current)
+    {
+        return candidate != null && current != null
+            && candidate.Category == TargetCategory.Resource
+            && current.Category == TargetCategory.Resource
+            && candidate.HealthNormalized + ResourceSwitchMargin < current.HealthNormalized;
+    }
+
+    // A resource-focusing weapon may take a resource another weapon already has.
+    private static bool IsSharedResource(bool focus, Damageable target)
+    {
+        return focus && target.Category == TargetCategory.Resource;
+    }
+
+    private bool IsBetter(Damageable candidate, Damageable current, Vector3 origin, bool resourcesByPercent = false)
     {
         int candidateTier = TierOf(candidate, origin);
         int currentTier = TierOf(current, origin);
@@ -477,7 +517,11 @@ public class WeaponLoadout : MonoBehaviour
             return candidateTier > currentTier;
         }
 
-        float healthDifference = candidate.Health - current.Health;
+        bool bothResources = resourcesByPercent && candidate.Category == TargetCategory.Resource
+            && current.Category == TargetCategory.Resource;
+        float healthDifference = bothResources
+            ? candidate.HealthNormalized - current.HealthNormalized
+            : candidate.Health - current.Health;
         if (Mathf.Abs(healthDifference) > HealthTieEpsilon)
         {
             return healthDifference < 0f;

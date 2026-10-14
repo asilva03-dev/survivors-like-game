@@ -12,8 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0f6d05af767b474781cb036ed38ef52, type: 3}
   m_Name: BasicArea
   m_EditorClassIdentifier: Assembly-CSharp::AreaStats
-  attacksPerSecond: 1
+  attackInterval: 1
   damage: 3
+  resourceDamageMultiplier: 0.6
+  targets: 3
   radius: 4.5
   maxTargets: -1
   color: {r: 1, g: 0, b: 0, a: 0.3}

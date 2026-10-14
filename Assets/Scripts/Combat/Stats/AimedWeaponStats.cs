@@ -12,6 +12,9 @@
  * - separationDistance is how much room (arc length along the ring, in units) this weapon needs from
  *   other weapons wanting the same spot. When two weapons meet, the larger of the two values is used,
  *   so give bigger guns bigger values to avoid clipping.
+ * - focusWeakestResource: when on, the weapon picks the resource with the lowest health percentage in
+ *   reach, may share one another weapon already took, and moves to a clearly weaker one while on
+ *   a resource. Off for guns (they spread over targets), on for the throwable.
  * - displacedTurnSpeed is the slower degrees per second used while sliding to or from a free spot
  *   (lower = smoother, less twitchy).
  */
@@ -27,8 +30,10 @@ public abstract class AimedWeaponStats : WeaponStats
     [SerializeField, Min(0f)] private float slotClearance = 1f;
     [SerializeField, Min(1f)] private float displacedTurnSpeed = 150f;
     [SerializeField, Min(0f)] private float separationDistance = 0.8f;
+    [SerializeField] private bool focusWeakestResource;
 
     public float SeparationDistance => separationDistance;
+    public bool FocusWeakestResource => focusWeakestResource;
 
     public float DisplacedTurnSpeed => displacedTurnSpeed;
     public override float Range => range;

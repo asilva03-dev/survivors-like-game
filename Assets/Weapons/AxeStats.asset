@@ -12,16 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0fb3110795cc58a409fb8476c2be5c62, type: 3}
   m_Name: AxeStats
   m_EditorClassIdentifier: Assembly-CSharp::MeleeStats
-  attacksPerSecond: 4
+  attackInterval: 0.3
   damage: 2
-  resourceDamage: 50
+  resourceDamageMultiplier: 25
   targets: 3
   reach: 3.8
-  arcAngle: 120
+  arcAngle: 160
   targetRadius: 0.4
   swingDuration: 0.25
   staminaCost: 15
-  attackInterval: 0.3
   chargeTime: 0.6
   chargedSwingDuration: 0.4
   chargedStaminaCost: 30
@@ -29,6 +28,8 @@ MonoBehaviour:
   chargedDamageMultiplier: 2
   knockbackDistance: 2
   knockbackDuration: 0.25
+  hitStopDuration: 0.06
+  chargedHitStopDuration: 0.12
   chargeMoveSpeedMultiplier: 0.6
   swingCurve:
     serializedVersion: 2
@@ -78,6 +79,41 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 0.45
       value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  tiltAngle: 20
+  tiltAxis: {x: 0, y: 1, z: 0}
+  tiltCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.45
+      value: -0.3
       inSlope: 0
       outSlope: 0
       tangentMode: 0

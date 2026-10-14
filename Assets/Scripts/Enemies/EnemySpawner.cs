@@ -7,6 +7,8 @@
  *   Instantiate/Destroy at runtime. Dead enemies are returned to the pool via Damageable.Died.
  * - Spawn rate (spawnsPerSecond) and the cap (maxEnemies) throttle spawning. If the cap is reached
  *   the timer holds, so there is no burst once enemies die.
+ * - SpawnsEnabled pauses/resumes spawning (the timer resets, so no burst on resume) and raises
+ *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
  * - A spawn point is a random spot at least minSpawnDistance from the player that is also outside the
  *   camera view (plus offscreenMargin in viewport units). If the first try is visible, the radius
  *   steps outward until it is not. Raise minSpawnDistance if enemies ever appear on screen.
@@ -40,6 +42,25 @@ public class EnemySpawner : MonoBehaviour
     private Rigidbody playerBody;
     private Camera cam;
     private float spawnTimer;
+    private bool spawnsEnabled = true;
+
+    public event System.Action<bool> SpawnsEnabledChanged;
+
+    public bool SpawnsEnabled
+    {
+        get { return spawnsEnabled; }
+        set
+        {
+            if (spawnsEnabled == value)
+            {
+                return;
+            }
+
+            spawnsEnabled = value;
+            spawnTimer = 0f;
+            SpawnsEnabledChanged?.Invoke(value);
+        }
+    }
 
     private void Awake()
     {
@@ -76,6 +97,13 @@ public class EnemySpawner : MonoBehaviour
         }
 
         float interval = 1f / spawnsPerSecond;
+
+        if (!spawnsEnabled)
+        {
+            RecycleFarEnemies();
+            return;
+        }
+
         spawnTimer += Time.deltaTime;
 
         if (alive.Count >= maxEnemies)

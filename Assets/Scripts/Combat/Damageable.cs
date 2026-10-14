@@ -10,6 +10,9 @@
  * - AimPoint is where projectiles are aimed: the transform position plus a world-space aimOffset.
  *   Things whose pivot is at their base (trees, walls) set aimOffset up to gun height so bullets fly
  *   level instead of diving into the ground before reaching them.
+ * - Velocity is the measured ground-plane (XZ) velocity, smoothed over a few frames from how far the
+ *   transform actually moved, so weapons can lead moving targets. Zero for static things and right
+ *   after the object is enabled (pooled objects teleport on spawn).
  * - All holds every enabled Damageable so systems never need scene searches. Health resets to full
  *   in OnEnable, so pooled objects come back healthy.
  * - Damaged (target, amount) fires on every hit, before death is handled, so killing blows are
@@ -57,10 +60,15 @@ public class Damageable : MonoBehaviour, IDamageable
     [SerializeField] private Vector3 aimOffset;
     [SerializeField] private Color damageNumberColor = Color.white;
 
+    private const float VelocitySmoothing = 12f;
+
     private float health;
+    private Vector3 lastPosition;
+    private Vector3 velocity;
 
     public Vector3 AimPoint => transform.position + aimOffset;
     public Color DamageNumberColor => damageNumberColor;
+    public Vector3 Velocity => velocity;
     public float Health => health;
     public float MaxHealth => maxHealth;
     public float HealthNormalized => maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
@@ -70,7 +78,24 @@ public class Damageable : MonoBehaviour, IDamageable
     protected virtual void OnEnable()
     {
         health = maxHealth;
+        lastPosition = transform.position;
+        velocity = Vector3.zero;
         All.Add(this);
+    }
+
+    private void LateUpdate()
+    {
+        float dt = Time.deltaTime;
+        Vector3 position = transform.position;
+
+        if (dt > 0f)
+        {
+            Vector3 measured = (position - lastPosition) / dt;
+            measured.y = 0f;
+            velocity = Vector3.Lerp(velocity, measured, 1f - Mathf.Exp(-VelocitySmoothing * dt));
+        }
+
+        lastPosition = position;
     }
 
     protected virtual void OnDisable()

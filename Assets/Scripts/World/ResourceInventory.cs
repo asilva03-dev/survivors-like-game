@@ -2,8 +2,8 @@
  * ResourceInventory
  * Run-wide resource totals. Only wood for now (stone and berries come with their own slices).
  *
- * - Listens to Damageable.Died and adds ResourceTree.WoodYield when a tree dies, so it works no
- *   matter which weapon landed the killing blow.
+ * - Wood is added when a WoodDrop is collected (WoodDrop.Collected), not when the tree dies.
+ *   WoodDropSpawner creates the drops from ResourceTree.WoodYield.
  * - WoodChanged fires with the new total for UI (see WoodCounterUI).
  * - TrySpend(amount) is for the base store later; it only spends what is available.
  */
@@ -19,9 +19,9 @@ public class ResourceInventory : MonoBehaviour
 
     public int Wood => wood;
 
-    private void OnEnable() => Damageable.Died += HandleDied;
+    private void OnEnable() => WoodDrop.Collected += HandleCollected;
 
-    private void OnDisable() => Damageable.Died -= HandleDied;
+    private void OnDisable() => WoodDrop.Collected -= HandleCollected;
 
     public bool TrySpend(int amount)
     {
@@ -35,12 +35,9 @@ public class ResourceInventory : MonoBehaviour
         return true;
     }
 
-    private void HandleDied(Damageable target)
+    private void HandleCollected(int amount)
     {
-        if (target is ResourceTree tree && tree.WoodYield > 0)
-        {
-            wood += tree.WoodYield;
-            WoodChanged?.Invoke(wood);
-        }
+        wood += amount;
+        WoodChanged?.Invoke(wood);
     }
 }

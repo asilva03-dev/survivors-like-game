@@ -13,12 +13,18 @@
  * - Attack speed: releasing a swing locks out Mouse 1 for attackInterval (normal) or
  *   chargedAttackInterval (charged) seconds, counted from the release. Presses during the lockout are
  *   ignored, not buffered. A failed attempt (no stamina) does not start a lockout.
+ * - Tilt: the model also rotates about its own center by tiltAngle * tiltCurve(swing time) around
+ *   tiltAxis (pivot space), so the axe starts cocked back and snaps forward through the strike
+ *   instead of staying rigid. Purely visual; hit detection ignores it.
+ * - Hit stop: hitting a resource freezes the swing for hitStopDuration / chargedHitStopDuration seconds
+ *   (the lockout is extended by the same time). Only the swing pauses; the world keeps running.
  * - While charging the player is slowed (PlayerController.MoveSpeedMultiplier). The axe is only
  *   visible during the swing itself, not while charging.
  * - The swing sweeps the pivot across arcAngle over the swing duration using swingCurve. At the same
  *   time extensionCurve pushes the model outward by extendDistance and scales it up by growAmount,
  *   easing back to normal by the end. Targets are hit as the blade passes them (angle between last and
- *   current sweep angle, within reach plus the current extension), once per target per swing, with
+ *   current sweep angle, within reach plus the current extension; each target counts as a disc of
+ *   targetRadius so close targets are caught by their edge), once per target per swing, with
  *   damage per category from MeleeStats.DamageFor.
  * - All numbers come from the MeleeStats asset. Visual setup (pivot, model rotation and scale, holdHeight)
  *   lives in the prefab: the pivot is rotated about Y and the model child holds the axe mesh.
@@ -49,6 +55,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
     private Vector3 lastAim = Vector3.forward;
     private Vector3 modelRestPosition;
     private Vector3 modelRestScale;
+    private Quaternion modelRestRotation = Quaternion.identity;
     private float aimYaw;
     private float chargeElapsed;
     private float swingElapsed;
@@ -57,6 +64,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
     private float lastSwingT;
     private float lockedUntil;
     private bool lockoutIsCharged;
+    private float hitStopRemaining;
     private bool strongSwing;
 
     public bool IsCharging => state == State.Charging;
@@ -91,6 +99,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         {
             modelRestPosition = model.localPosition;
             modelRestScale = model.localScale;
+            modelRestRotation = model.localRotation;
         }
 
         SetVisible(false);
@@ -172,6 +181,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         lockoutIsCharged = strongSwing;
         lastAngle = -Stats.ArcAngle * 0.5f;
         lastSwingT = 0f;
+        hitStopRemaining = 0f;
         hitThisSwing.Clear();
 
         ApplyPose(lastAngle);
@@ -180,6 +190,12 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
 
     private void AdvanceSwing()
     {
+        if (hitStopRemaining > 0f)
+        {
+            hitStopRemaining -= Time.deltaTime;
+            return;
+        }
+
         swingElapsed += Time.deltaTime;
         float t = Mathf.Clamp01(swingElapsed / Mathf.Max(swingDuration, 0.01f));
         float progress = Stats.SwingCurve.Evaluate(t);
@@ -187,7 +203,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         float angle = Mathf.LerpUnclamped(-half, half, progress);
 
         float extension = Mathf.Clamp01(Stats.ExtensionCurve.Evaluate(t));
-        ApplyPose(angle, extension);
+        ApplyPose(angle, extension, t);
         HitSweep(lastAngle, angle, Stats.ExtendDistance * PeakExtension(lastSwingT, t));
         lastAngle = angle;
         lastSwingT = t;
@@ -237,8 +253,15 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
                 continue;
             }
 
-            float angle = offset.sqrMagnitude > 0.0001f ? Vector3.SignedAngle(aim, offset, Vector3.up) : 0f;
-            if (angle >= low && angle <= high)
+            // The target is a disc of targetRadius, not a point: it is hit when any part of it
+            // falls inside the swept angle, which matters most up close where it spans a wide angle.
+            float distance = offset.magnitude;
+            float angle = distance > 0.0001f ? Vector3.SignedAngle(aim, offset, Vector3.up) : 0f;
+            float halfWidth = distance <= Stats.TargetRadius
+                ? 180f
+                : Mathf.Asin(Stats.TargetRadius / distance) * Mathf.Rad2Deg;
+
+            if (angle + halfWidth >= low && angle - halfWidth <= high)
             {
                 candidates.Add(target);
             }
@@ -263,6 +286,16 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         if (amount > 0f)
         {
             target.TakeDamage(amount);
+        }
+
+        if (target.Category == TargetCategory.Resource)
+        {
+            float stop = strongSwing ? Stats.ChargedHitStopDuration : Stats.HitStopDuration;
+            if (stop > hitStopRemaining)
+            {
+                lockedUntil += stop - hitStopRemaining;
+                hitStopRemaining = stop;
+            }
         }
 
         if (strongSwing && target is Enemy enemy && enemy.isActiveAndEnabled && Stats.KnockbackDistance > 0f)
@@ -299,13 +332,16 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         return lastAim;
     }
 
-    private void ApplyPose(float angle, float extension = 0f)
+    private void ApplyPose(float angle, float extension = 0f, float swingT = 0f)
     {
         pivot.position = Owner.position + Vector3.up * holdHeight;
         pivot.rotation = Quaternion.Euler(0f, aimYaw + angle, 0f);
 
         if (model != null)
         {
+            float tilt = Stats.TiltAngle * Stats.TiltCurve.Evaluate(swingT);
+            Vector3 axis = Stats.TiltAxis.sqrMagnitude > 0.0001f ? Stats.TiltAxis.normalized : Vector3.right;
+            model.localRotation = Quaternion.AngleAxis(tilt, axis) * modelRestRotation;
             model.localPosition = modelRestPosition + Vector3.forward * (Stats.ExtendDistance * extension);
             model.localScale = modelRestScale * (1f + Stats.GrowAmount * extension);
         }

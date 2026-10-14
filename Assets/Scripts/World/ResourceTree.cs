@@ -1,14 +1,15 @@
 /*
  * ResourceTree
  * A choppable tree: a Damageable in the Resource category with very high health, so guns and the area
- * weapon (low resourceDamage) barely scratch it and the axe in slice 3 is the intended tool.
+ * weapon (low resourceDamageMultiplier) barely scratch it and the axe in slice 3 is the intended tool.
  *
  * - Health, damage events, health bar and damage numbers all come from Damageable; nothing here
  *   changes targeting. TreeSpawner pools trees and swaps a dead tree for a stump.
  * - The leaves child wobbles on every hit (DOTween punch rotation + scale) while the trunk stays
  *   still. The tween is killed and the leaves reset when the tree is disabled, so pooled trees come
  *   back clean.
- * - woodYield is what ResourceInventory awards when the tree dies.
+ * - woodYield is how many wood drops (one wood each) WoodDropSpawner bursts out when the tree dies.
+ *   Edit it on the Tree prefab (Resource Tree > Wood Yield).
  * - Named ResourceTree because UnityEngine already has a Tree class.
  */
 

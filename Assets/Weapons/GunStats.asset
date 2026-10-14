@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 873fca6e5380d5d40b7f449266bb418e, type: 3}
-  m_Name: BasicGun
+  m_Name: GunStats
   m_EditorClassIdentifier: Assembly-CSharp::GunStats
-  attacksPerSecond: 2.5
+  attackInterval: 0.4
   damage: 5
-  resourceDamage: 5
+  resourceDamageMultiplier: 0.5
   targets: 3
   range: 8
   ringRadius: 1
@@ -28,3 +28,11 @@ MonoBehaviour:
   projectileSpeed: 20
   lifetime: 2
   muzzleOffset: 0.6
+  projectileCount: 2
+  projectileSpacing: 0.3
+  curveStartAngle: 50
+  curveAngleStep: 25
+  curveTurnSpeed: 240
+  pierce: 0
+  homing: 0
+  homingStrength: 0.5

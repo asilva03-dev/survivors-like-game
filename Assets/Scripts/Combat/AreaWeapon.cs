@@ -145,7 +145,7 @@ public class AreaWeapon : WeaponBase<AreaStats>
         return offset.sqrMagnitude;
     }
 
-    private static Mesh GetDiscMesh()
+    public static Mesh GetDiscMesh()
     {
         if (discMesh != null)
         {
