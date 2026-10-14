@@ -15,7 +15,7 @@ public class ThrowLStatsEditor : Editor
     private static readonly string[] StatFields =
     {
         "attackInterval", "damage", "resourceDamageMultiplier", "targets",
-        "range", "focusWeakestResource", "throwArc", "flightTime", "predictionStrength", "radius", "lifetime", "lingerDamageInterval", "fireAngleTolerance"
+        "range", "focusWeakestResource", "throwArc", "flightTime", "predictionStrength", "projectileCount", "spread", "landingSpread", "radius", "lifetime", "lingerDamageInterval", "fireAngleTolerance"
     };
 
     private static readonly string[] VisualFields =

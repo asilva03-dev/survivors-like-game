@@ -11,6 +11,12 @@
  * - predictionStrength is how much the throw leads a moving target: 0 lands on where it is now, 1
  *   lands where it will be when the throwable arrives (target velocity x flightTime, never past the
  *   owner). Below 1 hedges against enemies changing direction.
+ * - projectileCount is how many throwables leave per throw, all from the same point at the same time.
+ *   Targeting aims at the middle of the pattern: projectile 1 lands on the intended spot and the
+ *   rest are laid out around it within `spread` units (5 = middle, left, right, one nearer, one
+ *   further; more fill outer rings). A smaller spread keeps the same pattern, only tighter.
+ * - landingSpread is the bloom: each throw lands at a random point within this many units of the
+ *   intended (predicted) spot, uniformly over the disc, so it is never perfectly accurate. 0 = exact.
  * - radius is the size of the explosion circle / puddle on the ground; lifetime is how long (seconds)
  *   the puddle stays; lingerDamageInterval is the seconds between damage ticks while it is there
  *   (the first tick lands with the explosion). Each tick deals the weapon's damage to every target
@@ -29,6 +35,9 @@ public class ThrowLStats : AimedWeaponStats
     [SerializeField, Min(0f)] private float throwArc = 3f;
     [SerializeField, Min(0.05f)] private float flightTime = 0.7f;
     [SerializeField, Range(0f, 1f)] private float predictionStrength = 0.8f;
+    [SerializeField, Min(1)] private int projectileCount = 1;
+    [SerializeField, Min(0f)] private float spread = 2.5f;
+    [SerializeField, Min(0f)] private float landingSpread = 0.8f;
     [SerializeField, Min(0.1f)] private float radius = 2.5f;
     [SerializeField, Min(0.1f)] private float lifetime = 4f;
     [SerializeField, Min(0.05f)] private float lingerDamageInterval = 0.5f;
@@ -40,6 +49,9 @@ public class ThrowLStats : AimedWeaponStats
     public float ThrowArc => throwArc;
     public float FlightTime => flightTime;
     public float PredictionStrength => predictionStrength;
+    public int ProjectileCount => projectileCount;
+    public float Spread => spread;
+    public float LandingSpread => landingSpread;
     public float Radius => radius;
     public float Lifetime => lifetime;
     public float LingerDamageInterval => lingerDamageInterval;
