@@ -186,6 +186,11 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
 
         ApplyPose(lastAngle);
         SetVisible(true);
+
+        if (controller != null)
+        {
+            controller.Push(aim, strongSwing ? Stats.ChargedLungeDistance : Stats.LungeDistance, Stats.LungeDuration);
+        }
     }
 
     private void AdvanceSwing()
@@ -298,10 +303,11 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
             }
         }
 
-        if (strongSwing && target is Enemy enemy && enemy.isActiveAndEnabled && Stats.KnockbackDistance > 0f)
+        float knockback = strongSwing ? Stats.KnockbackDistance : Stats.KnockbackDistanceNormal;
+        if (target is Enemy enemy && enemy.isActiveAndEnabled && knockback > 0f)
         {
             Vector3 away = target.transform.position - origin;
-            enemy.Knockback(new Vector2(away.x, away.z), Stats.KnockbackDistance, Stats.KnockbackDuration);
+            enemy.Knockback(new Vector2(away.x, away.z), knockback, Stats.KnockbackDuration);
         }
     }
 

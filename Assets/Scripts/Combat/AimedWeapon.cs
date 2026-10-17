@@ -49,6 +49,13 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
     public float SeparationDistance => Stats.SeparationDistance;
 
     public bool FocusWeakestResource => Stats.FocusWeakestResource;
+    public bool AvoidCloseRange => Stats.AvoidCloseRange;
+    public bool PreferFarTargets => Stats.PreferFarTargets;
+    public bool StickyTargets => Stats.StickyTargets;
+    public bool UseRing => Stats.UseRing;
+    public bool ClaimsTargets => Stats.ClaimsTargets;
+    public bool PreferClusters => Stats.PreferClusters;
+    public float ClusterRadius => Stats.ClusterRadius;
 
     public bool CanTarget(TargetCategory category)
     {

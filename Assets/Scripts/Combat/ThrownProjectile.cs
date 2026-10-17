@@ -36,34 +36,7 @@ public class ThrownProjectile : MonoBehaviour
         }
 
         GameObject instance = Instantiate(model, modelHolder);
-        instance.transform.localPosition = Vector3.zero;
-
-        Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0)
-        {
-            return;
-        }
-
-        Bounds bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-        {
-            bounds.Encapsulate(renderers[i].bounds);
-        }
-
-        float largest = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-        if (largest > 0.0001f)
-        {
-            modelHolder.localScale = Vector3.one * (modelSize / largest);
-        }
-
-        // Recompute after scaling so the model's visual center sits on the holder's pivot (it spins there).
-        Bounds scaled = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-        {
-            scaled.Encapsulate(renderers[i].bounds);
-        }
-
-        instance.transform.position += modelHolder.position - scaled.center;
+        ModelFit.Fit(modelHolder, instance.transform, modelSize);
     }
 
     public void Launch(ComponentPool<ThrownProjectile> owningPool, Vector3 from, Vector3 to, float arcHeight,

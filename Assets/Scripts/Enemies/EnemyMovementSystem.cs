@@ -8,7 +8,10 @@
  *   computed before any are applied so processing order does not bias the crowd.
  * - A short hard pass then pushes apart any pair closer than minSpacing and keeps enemies outside
  *   stopDistance of the player, so enemies do not visibly overlap even in dense crowds.
- * - Speed and spacing come from the shared EnemySettings asset.
+ * - Spacing comes from the shared EnemySettings asset; speed from the enemy's own EnemyStats when it has one
+ *   (EnemySettings.MoveSpeed otherwise). An enemy whose WantsToMove is false (a ranged enemy shooting) stands
+ *   still but is still pushed apart from neighbours.
+ * - Each enemy's Visual (the model child) turns toward the player at turnSpeed; the root never rotates.
  * - Knocked-back enemies (Enemy.Knockback) stop seeking and add their push step to the move.
  * - Enemies keep their own Y. They need a kinematic Rigidbody (cheap collider moves) and live on the
  *   "Enemy" layer, whose collisions with the default layer are disabled here so a crowd cannot trap
@@ -78,7 +81,25 @@ public class EnemyMovementSystem : MonoBehaviour
         {
             Transform t = enemies[i].transform;
             t.position = new Vector3(moved[i].x, t.position.y, moved[i].y);
+            FaceTarget(enemies[i].Visual, moved[i], target);
         }
+    }
+
+    private void FaceTarget(Transform visual, Vector2 from, Vector2 target)
+    {
+        if (visual == null)
+        {
+            return;
+        }
+
+        Vector2 toTarget = target - from;
+        if (toTarget.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        Quaternion wanted = Quaternion.LookRotation(new Vector3(toTarget.x, 0f, toTarget.y));
+        visual.rotation = Quaternion.RotateTowards(visual.rotation, wanted, settings.TurnSpeed * Time.deltaTime);
     }
 
     private void BuildGrid(List<Enemy> enemies, int count, float cellSize)
@@ -109,9 +130,10 @@ public class EnemyMovementSystem : MonoBehaviour
             float distance = toTarget.magnitude;
             Vector2 seek = Vector2.zero;
 
-            if (!enemy.IsKnockedBack && distance > settings.StopDistance && dt > 0f)
+            if (!enemy.IsKnockedBack && enemy.WantsToMove && distance > settings.StopDistance && dt > 0f)
             {
-                float speed = Mathf.Min(settings.MoveSpeed, (distance - settings.StopDistance) / dt);
+                float moveSpeed = enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed;
+                float speed = Mathf.Min(moveSpeed, (distance - settings.StopDistance) / dt);
                 seek = toTarget / distance * speed;
             }
 

@@ -1,8 +1,8 @@
 /*
  * ThrowLStatsEditor
  * Inspector for ThrowLStats assets, same layout as GunStatsEditor: "Stats" (damage, timing, range,
- * puddle size) and "Visual" (model, colors, pool size, ring position, turn speeds, slot spacing).
- * Any field not listed here is drawn under "Other" so new fields never go missing.
+ * puddle size) and "Visual" (model, colors, pool size).
+ * The inherited ring/slot fields are hidden (HiddenFields). Any other unlisted field is drawn under "Other".
  */
 
 using System.Collections.Generic;
@@ -15,12 +15,17 @@ public class ThrowLStatsEditor : Editor
     private static readonly string[] StatFields =
     {
         "attackInterval", "damage", "resourceDamageMultiplier", "targets",
-        "range", "focusWeakestResource", "throwArc", "flightTime", "predictionStrength", "projectileCount", "spread", "landingSpread", "radius", "lifetime", "lingerDamageInterval", "fireAngleTolerance"
+        "range", "focusWeakestResource", "avoidCloseRange", "preferFarTargets", "stickyTargets", "useRing", "claimsTargets", "preferClusters", "clusterRadius", "throwArc", "flightTime", "predictionStrength", "projectileCount", "spread", "landingSpread", "radius", "lifetime", "lingerDamageInterval", "fireAngleTolerance"
     };
 
     private static readonly string[] VisualFields =
     {
-        "throwableModel", "lingerColor", "explosionColor", "prewarmCount",
+        "throwableModel", "lingerColor", "explosionColor", "prewarmCount"
+    };
+
+    // Inherited ring/slot fields: still read by AimedWeapon but meaningless for ThrowL (no model on the ring).
+    private static readonly string[] HiddenFields =
+    {
         "ringRadius", "turnSpeed", "displacedTurnSpeed", "slotClearance", "separationDistance"
     };
 
@@ -38,6 +43,7 @@ public class ThrowLStatsEditor : Editor
 
         List<string> known = new List<string>(StatFields);
         known.AddRange(VisualFields);
+        known.AddRange(HiddenFields);
         known.Add("m_Script");
 
         List<string> others = new List<string>();

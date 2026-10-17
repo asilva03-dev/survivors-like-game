@@ -3,8 +3,10 @@
  * Pooled enemy spawner that places enemies just off-screen and lets them walk in, Vampire
  * Survivors style.
  *
- * - Enemies come from a ComponentPool<Enemy> built from enemyPrefab (prewarmed), never
- *   Instantiate/Destroy at runtime. Dead enemies are returned to the pool via Damageable.Died.
+ * - Enemies come from ComponentPools built from enemyPrefab (normal) and rangedEnemyPrefab (prewarmed), never
+ *   Instantiate/Destroy at runtime. Each spawn picks the ranged type with probability rangedChance (0.2 = an
+ *   80/20 mix on average), else the normal one. Dead enemies are returned to the pool they came from via
+ *   Damageable.Died.
  * - Spawn rate (spawnsPerSecond) and the cap (maxEnemies) throttle spawning. If the cap is reached
  *   the timer holds, so there is no burst once enemies die.
  * - SpawnsEnabled pauses/resumes spawning (the timer resets, so no burst on resume) and raises
@@ -26,6 +28,9 @@ public class EnemySpawner : MonoBehaviour
     private const float AttemptRadiusStep = 2f;
 
     [SerializeField] private Enemy enemyPrefab;
+    [SerializeField] private Enemy rangedEnemyPrefab;
+    [SerializeField, Range(0f, 1f)] private float rangedChance = 0.2f;
+    [SerializeField, Min(0)] private int rangedPrewarmCount = 10;
     [SerializeField, Min(0.1f)] private float spawnsPerSecond = 2f;
     [SerializeField, Min(1)] private int maxEnemies = 30;
     [SerializeField, Min(1)] private int prewarmCount = 30;
@@ -34,10 +39,11 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Range(0f, 0.5f)] private float offscreenMargin = 0.1f;
     [SerializeField, Range(0f, 180f)] private float aheadAngle = 60f;
 
-    private readonly HashSet<Enemy> alive = new HashSet<Enemy>();
+    private readonly Dictionary<Enemy, ComponentPool<Enemy>> alive = new Dictionary<Enemy, ComponentPool<Enemy>>();
     private readonly List<Enemy> scratch = new List<Enemy>();
 
     private ComponentPool<Enemy> pool;
+    private ComponentPool<Enemy> rangedPool;
     private Transform player;
     private Rigidbody playerBody;
     private Camera cam;
@@ -66,6 +72,10 @@ public class EnemySpawner : MonoBehaviour
     {
         Transform poolRoot = new GameObject("Enemies").transform;
         pool = new ComponentPool<Enemy>(enemyPrefab, poolRoot, prewarmCount);
+        if (rangedEnemyPrefab != null)
+        {
+            rangedPool = new ComponentPool<Enemy>(rangedEnemyPrefab, poolRoot, rangedPrewarmCount);
+        }
     }
 
     private void OnEnable() => Damageable.Died += HandleDied;
@@ -124,15 +134,19 @@ public class EnemySpawner : MonoBehaviour
 
     private void Spawn()
     {
-        Enemy enemy = pool.Get(FindSpawnPoint(false), Quaternion.identity);
-        alive.Add(enemy);
+        ComponentPool<Enemy> source = rangedPool != null && Random.value < rangedChance ? rangedPool : pool;
+        Enemy enemy = source.Get(FindSpawnPoint(false), Quaternion.identity);
+        alive.Add(enemy, source);
     }
 
     private void HandleDied(Damageable target)
     {
-        if (target is Enemy enemy && alive.Remove(enemy))
+        Enemy enemy = target as Enemy;
+        ComponentPool<Enemy> source;
+        if (enemy != null && alive.TryGetValue(enemy, out source))
         {
-            pool.Release(enemy);
+            alive.Remove(enemy);
+            source.Release(enemy);
         }
     }
 
@@ -141,7 +155,7 @@ public class EnemySpawner : MonoBehaviour
         float sqrRecycle = recycleDistance * recycleDistance;
         scratch.Clear();
 
-        foreach (Enemy enemy in alive)
+        foreach (Enemy enemy in alive.Keys)
         {
             Vector3 offset = enemy.transform.position - player.position;
             offset.y = 0f;

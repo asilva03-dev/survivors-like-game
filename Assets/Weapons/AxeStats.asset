@@ -21,6 +21,7 @@ MonoBehaviour:
   targetRadius: 0.4
   swingDuration: 0.25
   staminaCost: 15
+  knockbackDistanceNormal: 0.6
   chargeTime: 0.6
   chargedSwingDuration: 0.4
   chargedStaminaCost: 30
@@ -28,6 +29,9 @@ MonoBehaviour:
   chargedDamageMultiplier: 2
   knockbackDistance: 2
   knockbackDuration: 0.25
+  lungeDistance: 0.4
+  chargedLungeDistance: 1.2
+  lungeDuration: 0.15
   hitStopDuration: 0.06
   chargedHitStopDuration: 0.12
   chargeMoveSpeedMultiplier: 0.6

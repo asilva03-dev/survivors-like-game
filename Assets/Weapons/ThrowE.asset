@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 622fd180c5abb904d9d88e3b0295deed, type: 3}
+  m_Name: ThrowE
+  m_EditorClassIdentifier: Assembly-CSharp::ThrowEStats
+  attackInterval: 5
+  damage: 10
+  resourceDamageMultiplier: 1
+  targets: 3
+  range: 15
+  ringRadius: 1.5
+  turnSpeed: 540
+  fireAngleTolerance: 10
+  slotClearance: 1
+  displacedTurnSpeed: 150
+  separationDistance: 0.8
+  focusWeakestResource: 1
+  avoidCloseRange: 1
+  preferFarTargets: 1
+  stickyTargets: 0
+  useRing: 0
+  claimsTargets: 0
+  preferClusters: 1
+  clusterRadius: 2.5
+  throwArc: 3
+  flightTime: 0.7
+  predictionStrength: 0.8
+  projectileCount: 1
+  spread: 5
+  landingSpread: 0.8
+  throwableModel: {fileID: 919132149155446097, guid: 30c37d8d57222fb4a9438f2d46f05f1f, type: 3}
+  explosionColor: {r: 0.8867924, g: 0.8552831, b: 0.8240477, a: 1}
+  prewarmCount: 4
+  explosionRadius: 4

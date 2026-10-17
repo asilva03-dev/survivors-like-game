@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4bc8747cd7cafb045ad5047093181255, type: 3}
   m_Name: ThrowL
   m_EditorClassIdentifier: Assembly-CSharp::ThrowLStats
-  attackInterval: 2
+  attackInterval: 5
   damage: 4
   resourceDamageMultiplier: 1
   targets: 3
@@ -24,13 +24,23 @@ MonoBehaviour:
   displacedTurnSpeed: 150
   separationDistance: 0.8
   focusWeakestResource: 1
+  avoidCloseRange: 1
+  preferFarTargets: 1
+  stickyTargets: 0
+  useRing: 0
+  claimsTargets: 0
+  preferClusters: 1
+  clusterRadius: 2.5
   throwArc: 3
   flightTime: 0.7
   predictionStrength: 0.8
-  radius: 2.5
-  lifetime: 4
-  lingerDamageInterval: 0.5
+  projectileCount: 1
+  spread: 5
+  landingSpread: 0.8
   throwableModel: {fileID: 919132149155446097, guid: 27c622eb2249a83499944b95a7452a6f, type: 3}
-  lingerColor: {r: 1, g: 0.4, b: 0.05, a: 0.6}
   explosionColor: {r: 1, g: 0.55, b: 0.1, a: 1}
   prewarmCount: 4
+  radius: 2.5
+  lifetime: 3
+  lingerDamageInterval: 1
+  lingerColor: {r: 1, g: 0.4, b: 0.05, a: 0.6}

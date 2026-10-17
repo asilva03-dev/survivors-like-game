@@ -167,7 +167,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ThrownProjectile
   modelHolder: {fileID: 9222728605073530322}
   trail: {fileID: 8287090020228960675}
-  modelSize: 0.6
+  modelSize: 1.2
   spinSpeed: 540
 --- !u!1 &8172332909224759676
 GameObject:

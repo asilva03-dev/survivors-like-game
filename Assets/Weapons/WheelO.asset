@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db6f8cea6f6df1746bcb187b50d84182, type: 3}
+  m_Name: WheelO
+  m_EditorClassIdentifier: Assembly-CSharp::WheelOStats
+  attackInterval: 0.4
+  damage: 7
+  resourceDamageMultiplier: 1
+  targets: 3
+  projectileCount: 8
+  orbitRadius: 2.5
+  orbitHeight: 0
+  rotateSpeed: 180
+  duration: 6
+  cooldown: 3
+  perEnemyCooldown: 0.5
+  hitRadius: 0.9
+  objectModel: {fileID: 919132149155446097, guid: 10179d32e39494240a5ad5246a1db465, type: 3}
+  objectSize: 1.2

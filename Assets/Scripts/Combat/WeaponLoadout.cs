@@ -26,6 +26,20 @@
  *   top-priority target in it (no splitting), regardless of each weapon's own range. This target is
  *   chosen once for the whole loadout and kept until it dies, leaves closeRange, or a higher tier
  *   target (boss or elite) enters closeRange.
+ * - Weapons with avoidCloseRange (ThrowL/ThrowE) opt out of all of the above: they ignore the shared close
+ *   target and the close-range tier bonus, skip targets inside closeRange while a target of the same kind is
+ *   available outside it, and only take close targets when nothing else is in reach. If every weapon opts
+ *   out, no shared close target is chosen.
+ * - Weapons with preferClusters (ThrowL/ThrowE) first rank enemies by how many other enemies stand within
+ *   clusterRadius of them (most first) within the same boss/elite rank, above distance; the close-range avoidance still filters
+ *   targets first. When counts tie (all enemies alone) the normal order applies.
+ * - Weapons with claimsTargets off (ThrowL/ThrowE) neither respect nor create claims: they ignore what guns have
+ *   taken, and guns do not avoid the enemy they chose. Claims only exist between claiming weapons (guns).
+ * - Weapons with useRing off (ThrowL/ThrowE) are left out of slot spacing and side pairing, so they never push
+ *   another weapon's ring spot.
+ * - Weapons with stickyTargets off (ThrowL/ThrowE) skip the sticky rule and re-pick every frame.
+ * - Weapons with preferFarTargets (ThrowL/ThrowE) rank targets of the same tier by distance, FARTHEST first, instead
+ *   of lowest HP then closest. Resources still use the weakest-percentage rule for focusWeakestResource weapons.
  * - Otherwise a weapon can only target enemies inside its own range.
  * - Sticky targets: a weapon keeps its current target while it is alive, still targetable and not
  *   claimed by an earlier weapon, and switches only when an enemy of a strictly higher tier (close
@@ -65,6 +79,13 @@ public interface IAimedWeapon
     Vector3 SlotDirection { get; }
     bool CanTarget(TargetCategory category);
     bool FocusWeakestResource { get; }
+    bool AvoidCloseRange { get; }
+    bool PreferFarTargets { get; }
+    bool StickyTargets { get; }
+    bool UseRing { get; }
+    bool ClaimsTargets { get; }
+    bool PreferClusters { get; }
+    float ClusterRadius { get; }
 }
 
 public class WeaponLoadout : MonoBehaviour
@@ -96,6 +117,9 @@ public class WeaponLoadout : MonoBehaviour
     private readonly HashSet<Damageable> taken = new HashSet<Damageable>();
     private readonly Dictionary<IAimedWeapon, Damageable> lastTargets = new Dictionary<IAimedWeapon, Damageable>();
 
+    private readonly Dictionary<Damageable, int> clusterCounts = new Dictionary<Damageable, int>();
+    private readonly List<Damageable> clusterEnemies = new List<Damageable>();
+    private bool clusterActive;
     private Damageable closeTarget;
     private int refreshedFrame = -1;
 
@@ -188,18 +212,19 @@ public class WeaponLoadout : MonoBehaviour
         targets.Clear();
         angles.Clear();
 
+        clusterActive = false;
         bool enemyInReach = AnyEnemyInReach();
         Damageable closeTarget = SelectCloseTarget(enemyInReach);
 
         for (int i = 0; i < weapons.Count; i++)
         {
             IAimedWeapon weapon = weapons[i];
-            Damageable target = closeTarget != null ? closeTarget : SelectTarget(weapon);
+            Damageable target = closeTarget != null && !weapon.AvoidCloseRange ? closeTarget : SelectTarget(weapon);
 
             targets.Add(target);
             angles.Add(float.NaN);
 
-            if (target != null)
+            if (target != null && weapon.ClaimsTargets)
             {
                 taken.Add(target);
             }
@@ -237,7 +262,7 @@ public class WeaponLoadout : MonoBehaviour
         pairWeapons.Clear();
         for (int i = 0; i < weapons.Count; i++)
         {
-            if (targets[i] != null && !weapons[i].FocusWeakestResource)
+            if (targets[i] != null && !weapons[i].FocusWeakestResource && weapons[i].UseRing)
             {
                 pairWeapons.Add(i);
             }
@@ -356,8 +381,27 @@ public class WeaponLoadout : MonoBehaviour
         return false;
     }
 
+    private bool AnyWeaponUsesCloseTarget()
+    {
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            if (!weapons[i].AvoidCloseRange)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private Damageable SelectCloseTarget(bool enemyInReach)
     {
+        if (!AnyWeaponUsesCloseTarget())
+        {
+            closeTarget = null;
+            return null;
+        }
+
         Vector3 origin = transform.position;
         float sqrClose = closeRange * closeRange;
         Damageable best = null;
@@ -400,7 +444,7 @@ public class WeaponLoadout : MonoBehaviour
     {
         for (int i = 0; i < weapons.Count; i++)
         {
-            if (!weapons[i].CanTarget(category))
+            if (!weapons[i].AvoidCloseRange && !weapons[i].CanTarget(category))
             {
                 return false;
             }
@@ -423,8 +467,42 @@ public class WeaponLoadout : MonoBehaviour
         Damageable previous;
         lastTargets.TryGetValue(weapon, out previous);
         bool focus = weapon.FocusWeakestResource;
-        bool keepPrevious = previous != null && previous.isActiveAndEnabled
-            && IsCandidate(weapon, previous) && (!taken.Contains(previous) || IsSharedResource(focus, previous));
+        bool avoid = weapon.AvoidCloseRange;
+        bool claims = weapon.ClaimsTargets;
+        bool far = weapon.PreferFarTargets;
+
+        bool outsideEnemy = false;
+        bool outsideResource = false;
+        bool anyEnemy = false;
+        if (avoid)
+        {
+            for (int i = 0; i < Damageable.All.Count; i++)
+            {
+                Damageable candidate = Damageable.All[i];
+                if (!IsCandidate(weapon, candidate))
+                {
+                    continue;
+                }
+
+                bool resource = candidate.Category == TargetCategory.Resource;
+                anyEnemy |= !resource;
+                if (!IsInCloseRange(candidate, origin))
+                {
+                    outsideEnemy |= !resource;
+                    outsideResource |= resource;
+                }
+            }
+        }
+
+        clusterActive = weapon.PreferClusters;
+        if (clusterActive)
+        {
+            ComputeClusters(weapon);
+        }
+
+        bool keepPrevious = weapon.StickyTargets && previous != null && previous.isActiveAndEnabled
+            && IsCandidate(weapon, previous) && (!claims || !taken.Contains(previous) || IsSharedResource(focus, previous))
+            && !(avoid && SkipForAvoid(previous, origin, outsideEnemy, outsideResource, anyEnemy));
 
         Damageable bestFree = null;
         Damageable bestAny = null;
@@ -432,18 +510,19 @@ public class WeaponLoadout : MonoBehaviour
         for (int i = 0; i < Damageable.All.Count; i++)
         {
             Damageable enemy = Damageable.All[i];
-            if (!IsCandidate(weapon, enemy))
+            if (!IsCandidate(weapon, enemy)
+                || (avoid && SkipForAvoid(enemy, origin, outsideEnemy, outsideResource, anyEnemy)))
             {
                 continue;
             }
 
-            if ((!taken.Contains(enemy) || IsSharedResource(focus, enemy))
-                && (bestFree == null || IsBetter(enemy, bestFree, origin, focus)))
+            if ((!claims || !taken.Contains(enemy) || IsSharedResource(focus, enemy))
+                && (bestFree == null || IsBetter(enemy, bestFree, origin, focus, avoid, far)))
             {
                 bestFree = enemy;
             }
 
-            if (bestAny == null || IsBetter(enemy, bestAny, origin, focus))
+            if (bestAny == null || IsBetter(enemy, bestAny, origin, focus, avoid, far))
             {
                 bestAny = enemy;
             }
@@ -458,13 +537,65 @@ public class WeaponLoadout : MonoBehaviour
             keepPrevious = keepPrevious && previous.Category != TargetCategory.Resource;
         }
 
-        if (keepPrevious && (bestFree == null || TierOf(bestFree, origin) <= TierOf(previous, origin))
+        if (keepPrevious && (bestFree == null || TierOf(bestFree, origin, avoid) <= TierOf(previous, origin, avoid))
             && !(focus && IsWeakerResource(bestFree, previous)))
         {
             return previous;
         }
 
         return bestFree != null ? bestFree : bestAny;
+    }
+
+    // Counts, for each enemy the weapon can reach, the other reachable enemies within its clusterRadius.
+    private void ComputeClusters(IAimedWeapon weapon)
+    {
+        clusterCounts.Clear();
+        clusterEnemies.Clear();
+
+        for (int i = 0; i < Damageable.All.Count; i++)
+        {
+            Damageable candidate = Damageable.All[i];
+            if (candidate.Category != TargetCategory.Resource && IsCandidate(weapon, candidate))
+            {
+                clusterEnemies.Add(candidate);
+            }
+        }
+
+        float sqrRadius = weapon.ClusterRadius * weapon.ClusterRadius;
+        for (int a = 0; a < clusterEnemies.Count; a++)
+        {
+            int count = 0;
+            Vector3 position = clusterEnemies[a].transform.position;
+
+            for (int b = 0; b < clusterEnemies.Count; b++)
+            {
+                if (a == b)
+                {
+                    continue;
+                }
+
+                Vector3 offset = clusterEnemies[b].transform.position - position;
+                offset.y = 0f;
+                if (offset.sqrMagnitude <= sqrRadius)
+                {
+                    count++;
+                }
+            }
+
+            clusterCounts[clusterEnemies[a]] = count;
+        }
+    }
+
+    // For close-range-avoiding weapons: a target inside closeRange is skipped while something of its kind
+    // is available outside it (an enemy inside is also kept over resources outside, as enemies always win).
+    private bool SkipForAvoid(Damageable target, Vector3 origin, bool outsideEnemy, bool outsideResource, bool anyEnemy)
+    {
+        if (!IsInCloseRange(target, origin))
+        {
+            return false;
+        }
+
+        return target.Category == TargetCategory.Resource ? !anyEnemy && outsideResource : outsideEnemy;
     }
 
     private bool IsCandidate(IAimedWeapon weapon, Damageable enemy)
@@ -480,17 +611,15 @@ public class WeaponLoadout : MonoBehaviour
         return sqr <= weapon.Range * weapon.Range || sqr <= closeRange * closeRange;
     }
 
-    private int TierOf(Damageable enemy, Vector3 origin)
+    private int TierOf(Damageable enemy, Vector3 origin, bool ignoreClose = false)
     {
         if (enemy.Category == TargetCategory.Resource)
         {
             return ResourceTier;
         }
 
-        Vector3 offset = enemy.transform.position - origin;
-        offset.y = 0f;
         int tier = (int)enemy.Rank;
-        return offset.sqrMagnitude <= closeRange * closeRange ? tier + CloseTierBonus : tier;
+        return !ignoreClose && IsInCloseRange(enemy, origin) ? tier + CloseTierBonus : tier;
     }
 
     // True when both are resources and the candidate is lower in health percentage by the switch margin.
@@ -508,17 +637,38 @@ public class WeaponLoadout : MonoBehaviour
         return focus && target.Category == TargetCategory.Resource;
     }
 
-    private bool IsBetter(Damageable candidate, Damageable current, Vector3 origin, bool resourcesByPercent = false)
+    private bool IsBetter(Damageable candidate, Damageable current, Vector3 origin, bool resourcesByPercent = false,
+        bool ignoreClose = false, bool preferFar = false)
     {
-        int candidateTier = TierOf(candidate, origin);
-        int currentTier = TierOf(current, origin);
+        int candidateTier = TierOf(candidate, origin, ignoreClose);
+        int currentTier = TierOf(current, origin, ignoreClose);
         if (candidateTier != currentTier)
         {
             return candidateTier > currentTier;
         }
 
+        if (clusterActive && candidate.Category != TargetCategory.Resource && current.Category != TargetCategory.Resource)
+        {
+            int candidateCluster, currentCluster;
+            clusterCounts.TryGetValue(candidate, out candidateCluster);
+            clusterCounts.TryGetValue(current, out currentCluster);
+            if (candidateCluster != currentCluster)
+            {
+                return candidateCluster > currentCluster;
+            }
+        }
+
         bool bothResources = resourcesByPercent && candidate.Category == TargetCategory.Resource
             && current.Category == TargetCategory.Resource;
+        if (preferFar && !bothResources)
+        {
+            Vector3 farCandidate = candidate.transform.position - origin;
+            Vector3 farCurrent = current.transform.position - origin;
+            farCandidate.y = 0f;
+            farCurrent.y = 0f;
+            return farCandidate.sqrMagnitude > farCurrent.sqrMagnitude;
+        }
+
         float healthDifference = bothResources
             ? candidate.HealthNormalized - current.HealthNormalized
             : candidate.Health - current.Health;
@@ -542,7 +692,7 @@ public class WeaponLoadout : MonoBehaviour
             {
                 for (int b = a + 1; b < weapons.Count; b++)
                 {
-                    if (float.IsNaN(angles[a]) || float.IsNaN(angles[b]))
+                    if (float.IsNaN(angles[a]) || float.IsNaN(angles[b]) || !weapons[a].UseRing || !weapons[b].UseRing)
                     {
                         continue;
                     }

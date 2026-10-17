@@ -75,6 +75,12 @@ public class Damageable : MonoBehaviour, IDamageable
     public TargetCategory Category => category;
     public TargetRank Rank => rank;
 
+    // For subclasses that take their health from a stats asset; call before OnEnable (e.g. in Awake).
+    protected void SetMaxHealth(float value)
+    {
+        maxHealth = value;
+    }
+
     protected virtual void OnEnable()
     {
         health = maxHealth;

@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4e4e0379a338a941b258d4df247aaf0, type: 3}
+  m_Name: RangedRat
+  m_EditorClassIdentifier: Assembly-CSharp::RangedEnemyStats
+  maxHealth: 20
+  moveSpeed: 2
+  range: 18
+  fireInterval: 5
+  projectileCount: 1
+  spreadAngle: 15
+  projectileSpeed: 7
+  projectileLifetime: 10
+  damage: 5
+  hitRadius: 0.5
+  targets: 12
+  shotsBeforeMoveMin: 2
+  shotsBeforeMoveMax: 4
+  moveCloserChance: 0.5
+  advanceDistance: 3
+  projectilePrefab: {fileID: 3052980020677440402, guid: eb9cf14441f3bfe47b81abee0a9637bf, type: 3}

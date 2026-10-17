@@ -7,6 +7,11 @@
  *   spawning and the debug kill key.
  * - Enemy movement lives in EnemyMovementSystem and spawning / pooling in EnemySpawner.
  * - Serialized fields (maxHealth, rank) are inherited, so existing enemy prefabs keep their values.
+ * - An optional EnemyStats asset gives the enemy type its health and move speed (applied in Awake, so it
+ *   overrides the prefab's Max Health); without one the prefab health and EnemySettings speed apply.
+ *   WantsToMove lets a subclass (ranged enemies) stand still; EnemyMovementSystem only seeks while it is true.
+ * - Visual is the child that holds the model; EnemyMovementSystem turns it to face the player (the root, with
+ *   the collider and health bar, never rotates).
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -18,12 +23,26 @@ public class Enemy : Damageable
 {
     public static readonly List<Enemy> Active = new List<Enemy>();
 
+    [SerializeField] private Transform visual;
+    [SerializeField] private EnemyStats stats;
+
     private Vector2 knockDirection;
     private float knockDistance;
     private float knockDuration;
     private float knockRemaining;
 
     public bool IsKnockedBack => knockRemaining > 0f;
+    public Transform Visual => visual;
+    public EnemyStats Stats => stats;
+    public virtual bool WantsToMove => true;
+
+    protected virtual void Awake()
+    {
+        if (stats != null)
+        {
+            SetMaxHealth(stats.MaxHealth);
+        }
+    }
 
     protected override void OnEnable()
     {

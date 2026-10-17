@@ -23,6 +23,14 @@ MonoBehaviour:
   slotClearance: 1.5
   displacedTurnSpeed: 400
   separationDistance: 0.8
+  focusWeakestResource: 0
+  avoidCloseRange: 0
+  preferFarTargets: 0
+  stickyTargets: 1
+  useRing: 1
+  claimsTargets: 1
+  preferClusters: 0
+  clusterRadius: 2.5
   projectilePrefab: {fileID: 962566158592359736, guid: bc85c3b6d43932c4aacf34d196f642c1, type: 3}
   prewarmCount: 20
   projectileSpeed: 20

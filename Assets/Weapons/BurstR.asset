@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 815d89e583777e243a1cf0f970fc19ac, type: 3}
+  m_Name: BurstR
+  m_EditorClassIdentifier: Assembly-CSharp::BurstRStats
+  attackInterval: 2.5
+  damage: 6
+  resourceDamageMultiplier: 1
+  targets: 3
+  projectileCount: 8
+  speed: 12
+  lifetime: 2.5
+  spawnRadius: 0.6
+  spawnHeight: 0
+  hitRadius: 0.8
+  spinSpeed: 720
+  projectileModel: {fileID: 919132149155446097, guid: aef9f573149024d499f21e76cc5a7ae9, type: 3}
+  modelSize: 0.6
+  explosionColor: {r: 0.65, g: 0.55, b: 0.45, a: 1}
+  prewarmCount: 16

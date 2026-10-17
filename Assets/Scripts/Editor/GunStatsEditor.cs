@@ -16,7 +16,7 @@ public class GunStatsEditor : Editor
     private static readonly string[] StatFields =
     {
         "attackInterval", "damage", "resourceDamageMultiplier", "targets",
-        "range", "focusWeakestResource", "projectileCount", "pierce", "homing", "homingStrength", "projectileSpeed", "lifetime", "fireAngleTolerance"
+        "range", "focusWeakestResource", "avoidCloseRange", "preferFarTargets", "stickyTargets", "useRing", "claimsTargets", "preferClusters", "clusterRadius", "projectileCount", "pierce", "homing", "homingStrength", "projectileSpeed", "lifetime", "fireAngleTolerance"
     };
 
     private static readonly string[] VisualFields =

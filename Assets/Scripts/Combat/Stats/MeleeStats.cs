@@ -15,11 +15,15 @@
  *   sweep in degrees centered on the cursor direction, targetRadius extra reach so big targets (trees)
  *   count when their edge is touched.
  * - Normal attack: a quick press and release. swingDuration is the sweep time in seconds, staminaCost is
- *   paid on release.
+ *   paid on release. knockbackDistanceNormal is how far (units) it pushes enemies away, over the same
+ *   knockbackDuration as the charged attack (0 = no knockback on normal hits).
  * - Charged attack: hold until chargeTime seconds have passed, then release. It uses its own
  *   chargedSwingDuration and chargedStaminaCost, multiplies damage by chargedDamageMultiplier and pushes
- *   enemies away knockbackDistance units over knockbackDuration seconds. If the stamina for it is
+ *   enemies away knockbackDistance units (more than a normal hit) over knockbackDuration seconds. If the stamina for it is
  *   missing nothing happens (no fallback to a normal attack).
+ * - Lunge: each swing also pushes the player in the swing direction: lungeDistance (normal) or
+ *   chargedLungeDistance (charged) units, eased out over lungeDuration seconds, on top of normal movement
+ *   (0 = no lunge).
  * - Hit stop: when a swing hits a resource (tree) the swing animation freezes for hitStopDuration
  *   (normal) or chargedHitStopDuration (charged) seconds. The attack lockout is pushed back by the
  *   same time so attack spacing is unchanged.
@@ -48,6 +52,7 @@ public class MeleeStats : WeaponStats
     [Header("Normal attack")]
     [SerializeField, Min(0.02f)] private float swingDuration = 0.25f;
     [SerializeField, Min(0f)] private float staminaCost = 15f;
+    [SerializeField, Min(0f)] private float knockbackDistanceNormal = 0.6f;
 
     [Header("Charged attack")]
     [SerializeField, Min(0.05f)] private float chargeTime = 0.6f;
@@ -57,6 +62,11 @@ public class MeleeStats : WeaponStats
     [SerializeField, Min(0f)] private float chargedDamageMultiplier = 1.5f;
     [SerializeField, Min(0f)] private float knockbackDistance = 2f;
     [SerializeField, Min(0.02f)] private float knockbackDuration = 0.25f;
+
+    [Header("Lunge (push the player forward)")]
+    [SerializeField, Min(0f)] private float lungeDistance = 0.4f;
+    [SerializeField, Min(0f)] private float chargedLungeDistance = 1.2f;
+    [SerializeField, Min(0.02f)] private float lungeDuration = 0.15f;
 
     [Header("Hit stop (resources)")]
     [SerializeField, Min(0f)] private float hitStopDuration = 0.06f;
@@ -95,7 +105,11 @@ public class MeleeStats : WeaponStats
     public float ChargedStaminaCost => chargedStaminaCost;
     public float ChargedDamageMultiplier => chargedDamageMultiplier;
     public float KnockbackDistance => knockbackDistance;
+    public float KnockbackDistanceNormal => knockbackDistanceNormal;
     public float KnockbackDuration => knockbackDuration;
+    public float LungeDistance => lungeDistance;
+    public float ChargedLungeDistance => chargedLungeDistance;
+    public float LungeDuration => lungeDuration;
     public float HitStopDuration => hitStopDuration;
     public float ChargedHitStopDuration => chargedHitStopDuration;
     public float ChargeMoveSpeedMultiplier => chargeMoveSpeedMultiplier;

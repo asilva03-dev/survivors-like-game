@@ -9,6 +9,9 @@
  *   speed ramps from moveSpeed to sprintMaxSpeed over sprintTimeToMax seconds while
  *   draining sprintStaminaDrain per second. Sprint ends on release or empty stamina.
  * - Dash direction is the current input, or the last moved direction if there is none.
+ * - Push(direction, distance, duration) shoves the player along a direction (the axe lunge): an ease-out
+ *   shove that adds to the normal movement, covering `distance` units over `duration` seconds; a new push
+ *   replaces the old one.
  * - MoveSpeedMultiplier slows walking and sprinting (set by the melee weapon while charging).
  * - Inputs are defined here with default bindings and can be edited in the inspector.
  */
@@ -46,8 +49,28 @@ public class PlayerController : MonoBehaviour
     private Vector3 dashDirection;
     private float dashTimer;
     private float sprintTime;
+    private Vector3 pushDirection;
+    private float pushDistance;
+    private float pushDuration;
+    private float pushElapsed;
 
     public bool IsBoosting => mode != Mode.Normal;
+
+    // Ease-out shove along `direction` (flat): speed starts at 2 x distance / duration and falls to zero, so the
+    // total travelled is `distance`.
+    public void Push(Vector3 direction, float distance, float duration)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f || distance <= 0f)
+        {
+            return;
+        }
+
+        pushDirection = direction.normalized;
+        pushDistance = distance;
+        pushDuration = Mathf.Max(duration, 0.02f);
+        pushElapsed = 0f;
+    }
 
     // Scales walking and sprinting speed (not the dash); the melee weapon lowers it while charging.
     public float MoveSpeedMultiplier { get; set; } = 1f;
@@ -165,6 +188,17 @@ public class PlayerController : MonoBehaviour
         Vector3 velocity = body.linearVelocity;
         velocity.x = targetVelocity.x;
         velocity.z = targetVelocity.z;
+
+        if (pushElapsed < pushDuration)
+        {
+            // speed at the middle of this physics step, so the total comes out at `distance`
+            float mid = Mathf.Min(pushElapsed + Time.fixedDeltaTime * 0.5f, pushDuration);
+            float speed = 2f * pushDistance / pushDuration * (1f - mid / pushDuration);
+            velocity.x += pushDirection.x * speed;
+            velocity.z += pushDirection.z * speed;
+            pushElapsed += Time.fixedDeltaTime;
+        }
+
         body.linearVelocity = velocity;
     }
 
