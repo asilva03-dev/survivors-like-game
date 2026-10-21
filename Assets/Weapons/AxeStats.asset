@@ -30,7 +30,7 @@ MonoBehaviour:
   knockbackDistance: 2
   knockbackDuration: 0.25
   lungeDistance: 0.4
-  chargedLungeDistance: 1.2
+  chargedLungeDistance: 0.8
   lungeDuration: 0.15
   hitStopDuration: 0.06
   chargedHitStopDuration: 0.12

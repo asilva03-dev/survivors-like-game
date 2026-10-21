@@ -1,22 +1,23 @@
 /*
  * EnemyMovementSystem
- * Moves every active enemy toward the player and keeps them from overlapping, using separation
- * steering instead of physics. One component in the scene handles all enemies.
+ * Moves every active enemy toward its target (Enemy.Target: the player or the base, whichever is closer) and
+ * keeps them from overlapping, using separation steering instead of physics. One component handles all enemies.
  *
  * - Each frame: enemies are bucketed into a spatial grid so neighbor checks stay cheap, each enemy
- *   gets a seek velocity toward the player plus a push away from nearby enemies, and all moves are
+ *   gets a seek velocity toward its target plus a push away from nearby enemies, and all moves are
  *   computed before any are applied so processing order does not bias the crowd.
  * - A short hard pass then pushes apart any pair closer than minSpacing and keeps enemies outside
- *   stopDistance of the player, so enemies do not visibly overlap even in dense crowds.
+ *   stopDistance of their target's edge (stopDistance + Damageable.TargetRadius, so they stop around a big
+ *   base instead of walking into it), so enemies do not visibly overlap even in dense crowds.
  * - Spacing comes from the shared EnemySettings asset; speed from the enemy's own EnemyStats when it has one
  *   (EnemySettings.MoveSpeed otherwise). An enemy whose WantsToMove is false (a ranged enemy shooting) stands
  *   still but is still pushed apart from neighbours.
- * - Each enemy's Visual (the model child) turns toward the player at turnSpeed; the root never rotates.
+ * - Each enemy's Visual (the model child) turns toward its target at turnSpeed; the root never rotates.
  * - Knocked-back enemies (Enemy.Knockback) stop seeking and add their push step to the move.
  * - Enemies keep their own Y. They need a kinematic Rigidbody (cheap collider moves) and live on the
  *   "Enemy" layer, whose collisions with the default layer are disabled here so a crowd cannot trap
  *   the player. Projectile hit checks still see them.
- * - The player is found by the "Player" tag on Start.
+ * - An enemy without a target yet falls back to the player (found by the "Player" tag on Start).
  */
 
 using System.Collections.Generic;
@@ -33,6 +34,8 @@ public class EnemyMovementSystem : MonoBehaviour
     private readonly List<int> neighbors = new List<int>(32);
     private Vector2[] positions = new Vector2[64];
     private Vector2[] moved = new Vector2[64];
+    private Vector2[] goals = new Vector2[64];
+    private float[] stops = new float[64];
     private int[] nextInCell = new int[64];
 
     private Transform player;
@@ -67,21 +70,28 @@ public class EnemyMovementSystem : MonoBehaviour
         EnsureCapacity(count);
 
         float cellSize = Mathf.Max(settings.SeparationRadius, settings.MinSpacing);
-        Vector2 target = new Vector2(player.position.x, player.position.z);
+
+        for (int i = 0; i < count; i++)
+        {
+            Damageable target = enemies[i].Target;
+            Vector3 goal = target != null ? target.transform.position : player.position;
+            goals[i] = new Vector2(goal.x, goal.z);
+            stops[i] = settings.StopDistance + (target != null ? target.TargetRadius : 0f);
+        }
 
         BuildGrid(enemies, count, cellSize);
-        ComputeMoves(count, cellSize, target);
+        ComputeMoves(count, cellSize);
 
         for (int pass = 0; pass < HardPasses; pass++)
         {
-            ResolveOverlaps(count, cellSize, target);
+            ResolveOverlaps(count, cellSize);
         }
 
         for (int i = 0; i < count; i++)
         {
             Transform t = enemies[i].transform;
             t.position = new Vector3(moved[i].x, t.position.y, moved[i].y);
-            FaceTarget(enemies[i].Visual, moved[i], target);
+            FaceTarget(enemies[i].Visual, moved[i], goals[i]);
         }
     }
 
@@ -117,7 +127,7 @@ public class EnemyMovementSystem : MonoBehaviour
         }
     }
 
-    private void ComputeMoves(int count, float cellSize, Vector2 target)
+    private void ComputeMoves(int count, float cellSize)
     {
         float dt = Time.deltaTime;
         float radius = settings.SeparationRadius;
@@ -126,14 +136,14 @@ public class EnemyMovementSystem : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             Enemy enemy = Enemy.Active[i];
-            Vector2 toTarget = target - positions[i];
+            Vector2 toTarget = goals[i] - positions[i];
             float distance = toTarget.magnitude;
             Vector2 seek = Vector2.zero;
 
-            if (!enemy.IsKnockedBack && enemy.WantsToMove && distance > settings.StopDistance && dt > 0f)
+            if (!enemy.IsKnockedBack && enemy.WantsToMove && distance > stops[i] && dt > 0f)
             {
                 float moveSpeed = enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed;
-                float speed = Mathf.Min(moveSpeed, (distance - settings.StopDistance) / dt);
+                float speed = Mathf.Min(moveSpeed, (distance - stops[i]) / dt);
                 seek = toTarget / distance * speed;
             }
 
@@ -160,7 +170,7 @@ public class EnemyMovementSystem : MonoBehaviour
         }
     }
 
-    private void ResolveOverlaps(int count, float cellSize, Vector2 target)
+    private void ResolveOverlaps(int count, float cellSize)
     {
         float minSpacing = settings.MinSpacing;
         float sqrMin = minSpacing * minSpacing;
@@ -194,12 +204,12 @@ public class EnemyMovementSystem : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            Vector2 offset = moved[i] - target;
+            Vector2 offset = moved[i] - goals[i];
             float length = offset.magnitude;
-            if (length < settings.StopDistance)
+            if (length < stops[i])
             {
                 Vector2 away = length > 0.0001f ? offset / length : Fallback(i, count);
-                moved[i] = target + away * settings.StopDistance;
+                moved[i] = goals[i] + away * stops[i];
             }
         }
     }
@@ -259,5 +269,7 @@ public class EnemyMovementSystem : MonoBehaviour
         System.Array.Resize(ref positions, size);
         System.Array.Resize(ref moved, size);
         System.Array.Resize(ref nextInCell, size);
+        System.Array.Resize(ref goals, size);
+        System.Array.Resize(ref stops, size);
     }
 }

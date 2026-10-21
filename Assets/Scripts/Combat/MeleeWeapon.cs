@@ -25,7 +25,9 @@
  *   easing back to normal by the end. Targets are hit as the blade passes them (angle between last and
  *   current sweep angle, within reach plus the current extension; each target counts as a disc of
  *   targetRadius so close targets are caught by their edge), once per target per swing, with
- *   damage per category from MeleeStats.DamageFor.
+ *   damage per category from MeleeStats.DamageFor. Big targets add their Damageable.TargetRadius.
+ * - Things the axe cannot damage but that carry an IMeleeReactive (the base) are still swept: they get
+ *   OnMeleeHit once per swing and no damage, knockback or hit stop.
  * - All numbers come from the MeleeStats asset. Visual setup (pivot, model rotation and scale, holdHeight)
  *   lives in the prefab: the pivot is rotated about Y and the model child holds the axe mesh.
  * - ChargeNormalized / IsCharging / IsChargedLockout feed MeleeChargeIndicator.
@@ -239,32 +241,37 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         float high = Mathf.Max(from, to);
         Vector3 origin = Owner.position;
         Vector3 aim = Quaternion.Euler(0f, aimYaw, 0f) * Vector3.forward;
-        float maxDistance = Stats.Reach + extraReach + Stats.TargetRadius;
-        float sqrMax = maxDistance * maxDistance;
-
         candidates.Clear();
         for (int i = 0; i < Damageable.All.Count; i++)
         {
             Damageable target = Damageable.All[i];
-            if (!Stats.CanTarget(target.Category) || hitThisSwing.Contains(target))
+            if (hitThisSwing.Contains(target) || target.transform.IsChildOf(Owner))
             {
                 continue;
             }
 
+            if (!Stats.CanTarget(target.Category) && target.GetComponent<IMeleeReactive>() == null)
+            {
+                continue;
+            }
+
+            // The target is a disc of targetRadius (plus its own TargetRadius for big things like the base),
+            // not a point: it is hit when any part of it falls inside the swept angle, which matters most up
+            // close where it spans a wide angle.
+            float radius = Stats.TargetRadius + target.TargetRadius;
+            float maxDistance = Stats.Reach + extraReach + radius;
             Vector3 offset = target.transform.position - origin;
             offset.y = 0f;
-            if (offset.sqrMagnitude > sqrMax)
+            if (offset.sqrMagnitude > maxDistance * maxDistance)
             {
                 continue;
             }
 
-            // The target is a disc of targetRadius, not a point: it is hit when any part of it
-            // falls inside the swept angle, which matters most up close where it spans a wide angle.
             float distance = offset.magnitude;
             float angle = distance > 0.0001f ? Vector3.SignedAngle(aim, offset, Vector3.up) : 0f;
-            float halfWidth = distance <= Stats.TargetRadius
+            float halfWidth = distance <= radius
                 ? 180f
-                : Mathf.Asin(Stats.TargetRadius / distance) * Mathf.Rad2Deg;
+                : Mathf.Asin(radius / distance) * Mathf.Rad2Deg;
 
             if (angle + halfWidth >= low && angle - halfWidth <= high)
             {
@@ -281,6 +288,17 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
     private void Hit(Damageable target, Vector3 origin)
     {
         hitThisSwing.Add(target);
+
+        IMeleeReactive reactive = target.GetComponent<IMeleeReactive>();
+        if (reactive != null)
+        {
+            reactive.OnMeleeHit(origin, strongSwing);
+        }
+
+        if (!Stats.CanTarget(target.Category))
+        {
+            return;
+        }
 
         float amount = Stats.DamageFor(target.Category);
         if (strongSwing)

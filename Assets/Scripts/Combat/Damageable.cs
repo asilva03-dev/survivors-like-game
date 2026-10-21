@@ -109,12 +109,22 @@ public class Damageable : MonoBehaviour, IDamageable
         All.Remove(this);
     }
 
-    public void TakeDamage(float amount)
+    // True while the object ignores hits (the player's invulnerability frames); projectiles pass through it.
+    public virtual bool IsInvulnerable => false;
+
+    // False keeps the object alive at 0 health (the player, until lives exist).
+    protected virtual bool CanDie => true;
+
+    // Flat radius of the body around the pivot, for things measured from the outside (enemies stopping at,
+    // touching and shooting at a large structure). 0 = treat as a point, as before.
+    public virtual float TargetRadius => 0f;
+
+    public virtual void TakeDamage(float amount)
     {
         health -= amount;
         Damaged?.Invoke(this, amount);
 
-        if (health > 0f)
+        if (health > 0f || !CanDie)
         {
             return;
         }

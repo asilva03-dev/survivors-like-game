@@ -9,7 +9,8 @@
  * weapon (retarget callback = the loadout's current target for that weapon) for a new one. They give
  * up for good only after they have lined up on the target and then flown past it.
  * Pierce (GunStats.pierce): a bullet survives that many damageable hits and is released on the next;
- * each target is hit at most once per bullet. Non-damageable colliders still stop it.
+ * each target is hit at most once per bullet. Non-damageable colliders still stop it; Damageables the weapon
+ * cannot target (the base, a Structure) are flown through.
  *
  * - Never created or destroyed at runtime: the weapon's ComponentPool owns it. Launch()
  *   fully resets state and the pool returns it with Release() on hit or when lifetime ends.
@@ -106,7 +107,7 @@ public class Projectile : MonoBehaviour
             }
 
             Damageable target = other.GetComponentInParent<Damageable>();
-            if (target != null && !hitTargets.Contains(target))
+            if (target != null && !hitTargets.Contains(target) && stats.CanTarget(target.Category))
             {
                 if (HitAndCheckDone(target))
                 {
@@ -237,9 +238,10 @@ public class Projectile : MonoBehaviour
                 Physics.AllLayers, QueryTriggerInteraction.Ignore))
         {
             bool isOwner = ignoreRoot != null && hit.collider.transform.IsChildOf(ignoreRoot);
-            if (!isOwner)
+            Damageable target = isOwner ? null : hit.collider.GetComponentInParent<Damageable>();
+            bool passThrough = target != null && !stats.CanTarget(target.Category);
+            if (!isOwner && !passThrough)
             {
-                Damageable target = hit.collider.GetComponentInParent<Damageable>();
                 if (target == null || !hitTargets.Contains(target))
                 {
                     if (target == null || HitAndCheckDone(target))

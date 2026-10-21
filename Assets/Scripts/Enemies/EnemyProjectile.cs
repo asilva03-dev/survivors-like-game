@@ -8,8 +8,10 @@
  *   object and only grow. Launch() fully resets state.
  * - The model and its size are set on the prefab. The projectile turns to face its direction of travel (the
  *   model's +Z leads).
- * - Hits are a flat (XZ) distance check from each target to the segment travelled this frame, so fast
+ * - Hits are a flat (XZ) distance check from each target to the segment travelled this frame (hitRadius plus the
+ *   target's TargetRadius, so the big base is hit at its walls), so fast
  *   projectiles never tunnel and height does not matter; the same pattern as BurstProjectile.
+ * - Invulnerable targets (the player during i-frames) are skipped, so the projectile flies through them.
  * - Damage goes straight to Damageable.TakeDamage, so the player and structures only need a Damageable in the
  *   Player / Structure category to be hurt.
  */
@@ -98,7 +100,6 @@ public class EnemyProjectile : MonoBehaviour
         Vector2 a = new Vector2(from.x, from.z);
         Vector2 segment = new Vector2(to.x, to.z) - a;
         float sqrLength = segment.sqrMagnitude;
-        float sqrRadius = hitRadius * hitRadius;
 
         Damageable best = null;
         float bestT = 2f;
@@ -106,14 +107,15 @@ public class EnemyProjectile : MonoBehaviour
         for (int i = 0; i < Damageable.All.Count; i++)
         {
             Damageable candidate = Damageable.All[i];
-            if (!targets.Contains(candidate.Category))
+            if (!targets.Contains(candidate.Category) || candidate.IsInvulnerable)
             {
                 continue;
             }
 
             Vector2 point = new Vector2(candidate.transform.position.x, candidate.transform.position.z);
             float t = sqrLength > 0.000001f ? Mathf.Clamp01(Vector2.Dot(point - a, segment) / sqrLength) : 0f;
-            if ((point - (a + segment * t)).sqrMagnitude <= sqrRadius && t < bestT)
+            float reach = hitRadius + candidate.TargetRadius;
+            if ((point - (a + segment * t)).sqrMagnitude <= reach * reach && t < bestT)
             {
                 bestT = t;
                 best = candidate;

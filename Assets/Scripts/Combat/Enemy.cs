@@ -12,6 +12,11 @@
  *   WantsToMove lets a subclass (ranged enemies) stand still; EnemyMovementSystem only seeks while it is true.
  * - Visual is the child that holds the model; EnemyMovementSystem turns it to face the player (the root, with
  *   the collider and health bar, never rotates).
+ * - Target: every frame the enemy picks the closest of the player and the bases (BaseStructure.Active), measured
+ *   to their edge (Damageable.TargetRadius), ties going to the player. Movement, contact damage and ranged fire
+ *   all use it.
+ * - Contact damage: an enemy within its stats' contactRange of its target's edge hurts it, at most once per
+ *   contactInterval (see EnemyStats). Subclasses that override Update must call base.Update().
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -30,7 +35,10 @@ public class Enemy : Damageable
     private float knockDistance;
     private float knockDuration;
     private float knockRemaining;
+    private float contactCooldown;
 
+    // What this enemy is going for: the player or a base, whichever edge is closer (refreshed every frame).
+    public Damageable Target { get; private set; }
     public bool IsKnockedBack => knockRemaining > 0f;
     public Transform Visual => visual;
     public EnemyStats Stats => stats;
@@ -49,6 +57,59 @@ public class Enemy : Damageable
         base.OnEnable();
         Active.Add(this);
         knockRemaining = 0f;
+        contactCooldown = 0f;
+        RefreshTarget();
+    }
+
+    protected virtual void Update()
+    {
+        RefreshTarget();
+        TryContactDamage();
+    }
+
+    // Closest of the player and every base, measured to their edge (TargetRadius); a tie goes to the player.
+    public void RefreshTarget()
+    {
+        Vector3 position = transform.position;
+        Damageable best = PlayerHealth.Instance;
+        float bestDistance = best != null ? EdgeDistance(position, best) : float.MaxValue;
+
+        List<BaseStructure> bases = BaseStructure.Active;
+        for (int i = 0; i < bases.Count; i++)
+        {
+            float distance = EdgeDistance(position, bases[i]);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = bases[i];
+            }
+        }
+
+        Target = best;
+    }
+
+    public static float EdgeDistance(Vector3 from, Damageable target)
+    {
+        Vector3 offset = target.transform.position - from;
+        offset.y = 0f;
+        return offset.magnitude - target.TargetRadius;
+    }
+
+    // Hurts the current target while within the stats' contactRange of its edge, at most once per contactInterval.
+    private void TryContactDamage()
+    {
+        contactCooldown -= Time.deltaTime;
+        if (stats == null || Target == null || stats.ContactDamage <= 0f || contactCooldown > 0f
+            || Target.IsInvulnerable)
+        {
+            return;
+        }
+
+        if (EdgeDistance(transform.position, Target) <= stats.ContactRange)
+        {
+            Target.TakeDamage(stats.ContactDamage);
+            contactCooldown = stats.ContactInterval;
+        }
     }
 
     // Starts a push of `distance` units away along `direction` (XZ), easing out over `duration` seconds.

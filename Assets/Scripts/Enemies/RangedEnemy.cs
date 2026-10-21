@@ -1,13 +1,14 @@
 /*
  * RangedEnemy
- * Enemy that walks toward the player, stands still and shoots once the player is within range, and now and
- * then walks a bit closer. All numbers come from a RangedEnemyStats asset (set as the Enemy's Stats) (range, fire interval, projectile
+ * Enemy that walks toward its target (the player or the base, whichever is closer; see Enemy.Target), stands
+ * still and shoots once the target is within range, and now and then walks a bit closer. All numbers come from a RangedEnemyStats asset (set as the Enemy's Stats) (range, fire interval, projectile
  * speed / lifetime / damage / count, how often it advances).
  *
- * - States: Approach (walk until the player is within range), Shoot (stand still, fire a volley every
+ * - States: Approach (walk until the target is within range), Shoot (stand still, fire a volley every
  *   fireInterval), Advance (after a random number of volleys it rolls moveCloserChance; on success it walks
- *   toward the player for advanceDistance units, then goes back to Shoot). If the player moves out of range it
- *   goes back to Approach.
+ *   toward the target for advanceDistance units, then goes back to Shoot). If the target moves out of range it
+ *   goes back to Approach. Range is measured to the target's edge (TargetRadius), so a big base counts from its
+ *   walls.
  * - It never moves and shoots at once: a volley only fires while the enemy is in Shoot, not knocked back, and has
  *   actually stood still (below StillSpeed) for SettleTime, so after an Advance it must come to a full stop
  *   first, and being pushed by a crowd or knocked back holds fire until it settles. The fire timer keeps
@@ -15,9 +16,8 @@
  * - Walking itself is EnemyMovementSystem's (seek + separation); this class only says whether the enemy wants
  *   to move (WantsToMove), so it always keeps its spacing from neighbours even while standing.
  * - A volley leaves the Muzzle transform (a child of Visual placed at the gun on the model, so it turns with
- *   the model) and flies straight at the player's flat position. projectileCount > 1 fans the projectiles
+ *   the model) and flies straight at the target's flat position. projectileCount > 1 fans the projectiles
  *   evenly across spreadAngle. Projectiles come from a shared pool per prefab (EnemyProjectile.PoolFor).
- * - The player is found by the "Player" tag.
  */
 
 using UnityEngine;
@@ -33,7 +33,6 @@ public class RangedEnemy : Enemy
 
     private RangedEnemyStats rangedStats;
     private ComponentPool<EnemyProjectile> projectilePool;
-    private Transform player;
     private State state;
     private float fireTimer;
     private int shotsFired;
@@ -62,20 +61,16 @@ public class RangedEnemy : Enemy
         stillTime = 0f;
     }
 
-    private void Update()
+    protected override void Update()
     {
-        if (player == null)
-        {
-            GameObject found = GameObject.FindWithTag("Player");
-            if (found == null)
-            {
-                return;
-            }
+        base.Update();
 
-            player = found.transform;
+        if (Target == null)
+        {
+            return;
         }
 
-        float distance = FlatDistanceToPlayer();
+        float distance = EdgeDistance(transform.position, Target);
 
         Vector3 step = transform.position - previousPosition;
         step.y = 0f;
@@ -153,24 +148,17 @@ public class RangedEnemy : Enemy
         return Random.Range(rangedStats.ShotsBeforeMoveMin, rangedStats.ShotsBeforeMoveMax + 1);
     }
 
-    private float FlatDistanceToPlayer()
-    {
-        Vector3 offset = player.position - transform.position;
-        offset.y = 0f;
-        return offset.magnitude;
-    }
-
     private void Fire()
     {
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
-        Vector3 toPlayer = player.position - origin;
-        toPlayer.y = 0f;
-        if (toPlayer.sqrMagnitude < 0.0001f)
+        Vector3 toTarget = Target.transform.position - origin;
+        toTarget.y = 0f;
+        if (toTarget.sqrMagnitude < 0.0001f)
         {
             return;
         }
 
-        Vector3 aim = toPlayer.normalized;
+        Vector3 aim = toTarget.normalized;
         int count = rangedStats.ProjectileCount;
 
         for (int i = 0; i < count; i++)

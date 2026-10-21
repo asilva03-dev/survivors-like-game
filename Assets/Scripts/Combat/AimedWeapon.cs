@@ -217,6 +217,11 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
 
         for (int i = 0; i < Damageable.All.Count; i++)
         {
+            if (Damageable.All[i].Category == TargetCategory.Player)
+            {
+                continue;
+            }
+
             Vector3 offset = Flat(Damageable.All[i].transform.position - slot);
             if (offset.sqrMagnitude < sqrClearance)
             {
