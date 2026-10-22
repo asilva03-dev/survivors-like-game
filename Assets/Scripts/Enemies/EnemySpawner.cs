@@ -13,7 +13,9 @@
  *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
  * - A spawn point is a random spot at least minSpawnDistance from the player that is also outside the
  *   camera view (plus offscreenMargin in viewport units). If the first try is visible, the radius
- *   steps outward until it is not. Raise minSpawnDistance if enemies ever appear on screen.
+ *   steps outward until it is not. Raise minSpawnDistance if enemies ever appear on screen. The spot must also be
+ *   open ground outside the base layout (BuildGrid.IsOpenGroundAt within groundClearance), so enemies never appear
+ *   inside the walls. If no try passes, the last spot is used (the movement system frees an enemy that lands in a wall).
  * - Enemies farther than recycleDistance are teleported to a fresh off-screen spot, biased within
  *   aheadAngle degrees of the player's movement direction, instead of being destroyed.
  * - The player is found by the "Player" tag; the camera is Camera.main.
@@ -38,6 +40,8 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Min(1f)] private float recycleDistance = 30f;
     [SerializeField, Range(0f, 0.5f)] private float offscreenMargin = 0.1f;
     [SerializeField, Range(0f, 180f)] private float aheadAngle = 60f;
+    [Tooltip("A spawn spot must be open ground (no base layout cells) within this radius.")]
+    [SerializeField, Min(0f)] private float groundClearance = 0.6f;
 
     private readonly Dictionary<Enemy, ComponentPool<Enemy>> alive = new Dictionary<Enemy, ComponentPool<Enemy>>();
     private readonly List<Enemy> scratch = new List<Enemy>();
@@ -193,7 +197,7 @@ public class EnemySpawner : MonoBehaviour
             point = center + new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians)) * radius;
             point.y = height;
 
-            if (IsOffscreen(point))
+            if (IsOffscreen(point) && BuildGrid.IsOpenGroundAt(point, groundClearance))
             {
                 return point;
             }

@@ -528,6 +528,7 @@ MonoBehaviour:
   recycleDistance: 30
   offscreenMargin: 0.1
   aheadAngle: 60
+  groundClearance: 0.6
 --- !u!4 &147156300
 Transform:
   m_ObjectHideFlags: 0
@@ -1824,6 +1825,7 @@ MonoBehaviour:
   areaRadius: 40
   clearRadius: 8
   minSpacing: 5
+  layoutClearance: 2
   scaleRange: {x: 0.9, y: 1.15}
 --- !u!4 &914894359
 Transform:
@@ -2526,6 +2528,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1558303615}
   - component: {fileID: 1558303614}
+  - component: {fileID: 1558303616}
   m_Layer: 0
   m_Name: BasePoint
   m_TagString: Untagged
@@ -2562,6 +2565,31 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1558303616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558303613}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f968408bb4eedd4eb2a035554c66ed3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BaseLayout
+  grid: {fileID: 1821767658}
+  applyOnStart: 1
+  placements:
+  - chunk: {fileID: 11400000, guid: 73646b3fbf31e5348802ca980dc1e065, type: 2}
+    slot: {x: 0, y: 0}
+  - chunk: {fileID: 11400000, guid: a678b193fa95ebb4191d01a3303c5788, type: 2}
+    slot: {x: 1, y: 0}
+  - chunk: {fileID: 11400000, guid: dc4d7af59d49c464f923278ddcd11451, type: 2}
+    slot: {x: -1, y: 0}
+  showBlocks: 1
+  material: {fileID: 2100000, guid: 92beabca2fea2e643bb40d917cdbd77b, type: 2}
+  wallHeight: 1.5
+  wallLayer: Wall
 --- !u!1 &1595408377
 GameObject:
   m_ObjectHideFlags: 0
@@ -3436,6 +3464,7 @@ MonoBehaviour:
   pathColor: {r: 0.3, g: 0.85, b: 1, a: 0.3}
   wallColor: {r: 0.55, g: 0.55, b: 0.55, a: 0.7}
   buildStripColor: {r: 0.3, g: 0.45, b: 1, a: 0.45}
+  blockedColor: {r: 0, g: 0, b: 0, a: 0.35}
   arrowColor: {r: 1, g: 0.95, b: 0.55, a: 0.85}
   nearColor: {r: 1, g: 0.85, b: 0.3, a: 0.45}
   farColor: {r: 0.15, g: 0.2, b: 0.6, a: 0.45}
@@ -3451,8 +3480,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 069fab6943dd5b7458a17460883e1bd5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BuildGrid
-  width: 80
-  height: 80
+  width: 84
+  height: 84
   cellSize: 1
   baseRadius: 2.2
 --- !u!4 &1821767659
@@ -3516,62 +3545,6 @@ Transform:
   m_Children:
   - {fileID: 2117650944}
   m_Father: {fileID: 2082262112}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1877396542
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1877396544}
-  - component: {fileID: 1877396543}
-  m_Layer: 0
-  m_Name: TestWallRing
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1877396543
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1877396542}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0225c18f61c9296438f8145c41143058, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TestWallRing
-  grid: {fileID: 1821767658}
-  applyOnStart: 1
-  ringRadius: 7
-  thickness: 1
-  openingWidth: 4
-  openNorth: 1
-  openEast: 0
-  openSouth: 0
-  openWest: 1
-  showBlocks: 1
-  material: {fileID: 2100000, guid: 92beabca2fea2e643bb40d917cdbd77b, type: 2}
-  wallHeight: 1.5
---- !u!4 &1877396544
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1877396542}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1892301400
 GameObject:
@@ -3980,4 +3953,3 @@ SceneRoots:
   - {fileID: 1892301402}
   - {fileID: 1558303615}
   - {fileID: 1821767659}
-  - {fileID: 1877396544}

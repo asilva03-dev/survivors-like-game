@@ -5,7 +5,7 @@
  * - Dijkstra from all Base cells outward over walkable cells (Free/Path), 8 neighbours (straight step cost 10,
  *   diagonal 14), never stepping diagonally past an unwalkable corner. Each reachable cell then points at its
  *   neighbour with the lowest distance. Base cells and cells with no route to the base have no direction (zero).
- * - Wall avoidance: entering a cell within wallAvoidRange cells of a Wall/BuildStrip cell (8-way, so corners count)
+ * - Wall avoidance: entering a cell within wallAvoidRange cells of a Wall/BuildStrip/Blocked cell (8-way, so corners count)
  *   costs wallAvoidCost extra (less the farther it is), so routes keep off walls and corners: in an opening the
  *   edge lanes point diagonally into the middle lanes. 0 cost = pure shortest path.
  * - Rebuilt when the grid raises Changed (a layout change), never per frame; raises Rebuilt afterwards.
@@ -223,7 +223,7 @@ public class FlowField : MonoBehaviour
     private bool IsWall(Vector2Int cell)
     {
         CellState state = grid.GetState(cell);
-        return state == CellState.Wall || state == CellState.BuildStrip;
+        return state == CellState.Wall || state == CellState.BuildStrip || state == CellState.Blocked;
     }
 
     // A diagonal step needs both side cells open, so paths never squeeze past a wall corner.

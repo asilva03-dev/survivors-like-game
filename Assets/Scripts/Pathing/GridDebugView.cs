@@ -4,7 +4,7 @@
  * (Game view); press distanceKey (T) to toggle distance shading while it is shown.
  *
  * - Draws the cell lines (lineWidth thick) plus a tinted square on every cell that is not Free (Base, Path, Wall,
- *   BuildStrip each have a colour). Free cells only show the lines.
+ *   BuildStrip, Blocked each have a colour). Free cells only show the lines.
  * - With a FlowField: an arrow on every cell that has a route, pointing to the next cell toward the base
  *   (showArrows). Distance shading tints reachable cells from nearColor (next to the base) to farColor (the
  *   farthest reachable cell). Walkable cells with no route get no arrow.
@@ -44,6 +44,7 @@ public class GridDebugView : MonoBehaviour
     [SerializeField] private Color pathColor = new Color(0.3f, 0.85f, 1f, 0.3f);
     [SerializeField] private Color wallColor = new Color(0.55f, 0.55f, 0.55f, 0.7f);
     [SerializeField] private Color buildStripColor = new Color(0.3f, 0.45f, 1f, 0.45f);
+    [SerializeField] private Color blockedColor = new Color(0f, 0f, 0f, 0.35f);
     [SerializeField] private Color arrowColor = new Color(1f, 0.95f, 0.55f, 0.85f);
     [SerializeField] private Color nearColor = new Color(1f, 0.85f, 0.3f, 0.45f);
     [SerializeField] private Color farColor = new Color(0.15f, 0.2f, 0.6f, 0.45f);
@@ -234,6 +235,7 @@ public class GridDebugView : MonoBehaviour
             case CellState.Path: color = pathColor; return true;
             case CellState.Wall: color = wallColor; return true;
             case CellState.BuildStrip: color = buildStripColor; return true;
+            case CellState.Blocked: color = blockedColor; return true;
             default: color = Color.clear; return false;
         }
     }

@@ -12,6 +12,9 @@
  *   target's TargetRadius, so the big base is hit at its walls), so fast
  *   projectiles never tunnel and height does not matter; the same pattern as BurstProjectile.
  * - Invulnerable targets (the player during i-frames) are skipped, so the projectile flies through them.
+ * - Walls stop it: each frame's segment is sampled against the BuildGrid every quarter cell, and entering a Wall cell
+ *   releases the projectile there (a target touched before the wall in the same frame is still hit). Build strips
+ *   and blocked chunk ground do not stop it.
  * - Damage goes straight to Damageable.TakeDamage, so the player and structures only need a Damageable in the
  *   Player / Structure category to be hurt.
  */
@@ -79,9 +82,17 @@ public class EnemyProjectile : MonoBehaviour
     {
         Vector3 from = transform.position;
         Vector3 to = from + direction * (speed * Time.deltaTime);
+
+        // A wall ends the flight where the bullet enters it; a target before that point is still hit.
+        float wallT = WallAlong(from, to);
+        bool blocked = wallT <= 1f;
+        if (blocked)
+        {
+            to = Vector3.Lerp(from, to, wallT);
+        }
         transform.position = to;
 
-        if (HitAlong(from, to))
+        if (HitAlong(from, to) || blocked)
         {
             pool.Release(this);
             return;
@@ -92,6 +103,29 @@ public class EnemyProjectile : MonoBehaviour
         {
             pool.Release(this);
         }
+    }
+
+    // Fraction (0..1) of the segment where it first enters a Wall cell of the BuildGrid, sampled every quarter cell;
+    // above 1 when there is no wall (or no grid).
+    private static float WallAlong(Vector3 from, Vector3 to)
+    {
+        BuildGrid grid = BuildGrid.Instance;
+        if (grid == null)
+        {
+            return 2f;
+        }
+
+        float length = Vector3.Distance(from, to);
+        int samples = Mathf.Max(1, Mathf.CeilToInt(length / (grid.CellSize * 0.25f)));
+        for (int i = 0; i <= samples; i++)
+        {
+            float t = (float)i / samples;
+            if (grid.GetState(grid.WorldToCell(Vector3.Lerp(from, to, t))) == CellState.Wall)
+            {
+                return t;
+            }
+        }
+        return 2f;
     }
 
     // Damages the closest target along the segment (if any) and reports whether the projectile hit.

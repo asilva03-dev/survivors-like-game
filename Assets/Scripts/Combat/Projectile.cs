@@ -24,7 +24,8 @@
  *   physics step, so an enemy collider can land on a flying bullet between two casts; without the
  *   overlap check that bullet would pass straight through the enemy.
  * - Only Damageable colliders take damage; the owner's own colliders are ignored.
- *   Hitting any other collider also returns the projectile to the pool.
+ *   Hitting any other collider also returns the projectile to the pool. Colliders on the "Wall" layer (base wall
+ *   blocks) are skipped entirely (HitMask), so bullets fly over the walls.
  * - The trail is cleared on launch so a reused projectile does not streak from its old position.
  * - Pooled prefab setup: shared unlit material, shadows off, TrailRenderer on a child at the back.
  */
@@ -33,6 +34,22 @@ using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
+    private static int hitMask;
+
+    // Every layer except "Wall" (looked up once; all layers if the project has no Wall layer).
+    private static int HitMask
+    {
+        get
+        {
+            if (hitMask == 0)
+            {
+                int wall = LayerMask.NameToLayer("Wall");
+                hitMask = wall >= 0 ? Physics.AllLayers & ~(1 << wall) : Physics.AllLayers;
+            }
+            return hitMask;
+        }
+    }
+
     [SerializeField] private TrailRenderer trail;
     [SerializeField] private float hitRadius = 0.15f;
 
@@ -96,7 +113,7 @@ public class Projectile : MonoBehaviour
     private bool HitOverlappingTarget()
     {
         int count = Physics.OverlapSphereNonAlloc(transform.position, hitRadius, overlapBuffer,
-            Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            HitMask, QueryTriggerInteraction.Ignore);
 
         for (int i = 0; i < count; i++)
         {
@@ -235,7 +252,7 @@ public class Projectile : MonoBehaviour
         float step = speed * Time.deltaTime;
 
         if (Physics.SphereCast(transform.position, hitRadius, direction, out RaycastHit hit, step,
-                Physics.AllLayers, QueryTriggerInteraction.Ignore))
+                HitMask, QueryTriggerInteraction.Ignore))
         {
             bool isOwner = ignoreRoot != null && hit.collider.transform.IsChildOf(ignoreRoot);
             Damageable target = isOwner ? null : hit.collider.GetComponentInParent<Damageable>();

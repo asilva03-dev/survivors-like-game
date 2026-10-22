@@ -21,8 +21,10 @@
  * - Pathing (TD layer): an enemy whose target is a base follows the FlowField (blended cell direction) instead of
  *   seeking straight, and faces where it walks; where the field has no direction (inside the base cells, outside the
  *   grid, no route) it seeks straight as before. Enemies chasing the player still seek straight.
- * - Walls: after all moves, every enemy is pushed out of blocked grid cells (Wall / BuildStrip) as a circle of
+ * - Walls: after all moves, every enemy is pushed out of blocked grid cells (Wall / BuildStrip / Blocked) as a circle of
  *   wallRadius, so enemies slide along walls and never cross them (knockback and crowd pushes included).
+ * - An enemy buried deep inside a blocked area with no open side next to it (e.g. it spawned inside a chunk's blocked
+ *   ground) is moved to the nearest walkable cell (within 12 cells) instead of staying stuck.
  * - forceBaseTarget (debug, temporary) makes every enemy target the base (Enemy.ForceBaseTarget) so the pathing can
  *   be tested on its own until the light-radius targeting exists.
  */
@@ -144,13 +146,65 @@ public class EnemyMovementSystem : MonoBehaviour
                 }
             }
         }
+
+        // Buried deep inside a blocked area (e.g. spawned there), with no open side to leave through:
+        // move to the nearest walkable cell instead of staying stuck.
+        Vector2Int final = grid.WorldToCell(new Vector3(position.x, 0f, position.y));
+        if (IsBlocked(grid, final))
+        {
+            Vector2Int free;
+            if (FindNearestWalkable(grid, final, BuriedSearchRange, out free))
+            {
+                Vector3 center = grid.CellToWorld(free);
+                position = new Vector2(center.x, center.z);
+            }
+        }
         return position;
+    }
+
+    private const int BuriedSearchRange = 12;
+
+    // Closest Free/Path cell by ring distance (Chebyshev rings, nearest by real distance within the first ring found).
+    private static bool FindNearestWalkable(BuildGrid grid, Vector2Int start, int range, out Vector2Int result)
+    {
+        for (int ring = 1; ring <= range; ring++)
+        {
+            float best = float.MaxValue;
+            result = start;
+            for (int dy = -ring; dy <= ring; dy++)
+            {
+                for (int dx = -ring; dx <= ring; dx++)
+                {
+                    if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) != ring)
+                    {
+                        continue;
+                    }
+                    Vector2Int cell = new Vector2Int(start.x + dx, start.y + dy);
+                    if (!grid.IsWalkable(cell))
+                    {
+                        continue;
+                    }
+                    float distance = dx * dx + dy * dy;
+                    if (distance < best)
+                    {
+                        best = distance;
+                        result = cell;
+                    }
+                }
+            }
+            if (best < float.MaxValue)
+            {
+                return true;
+            }
+        }
+        result = start;
+        return false;
     }
 
     private static bool IsBlocked(BuildGrid grid, Vector2Int cell)
     {
         CellState state = grid.GetState(cell);
-        return state == CellState.Wall || state == CellState.BuildStrip;
+        return state == CellState.Wall || state == CellState.BuildStrip || state == CellState.Blocked;
     }
 
     private Vector2 PushOutOfBox(BuildGrid grid, Vector2Int cell, Vector2 from, Vector2 position, Vector2 min,

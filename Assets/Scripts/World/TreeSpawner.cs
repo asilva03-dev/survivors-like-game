@@ -3,7 +3,9 @@
  * Scatters pooled trees around the spawner, replaces dead trees with stumps and regrows them later.
  *
  * - SpawnAll() picks up to treeCount random spots inside areaRadius (at least minSpacing apart and
- *   outside clearRadius of the spawner) and places a tree on each. ClearAll() returns every tree and
+ *   outside clearRadius of the spawner, and on open ground at least layoutClearance from any base layout cell) and
+ *   places a tree on each. BaseLayout runs its Start first (execution order), so the walls exist when trees are placed;
+ *   trees already standing are not moved if the layout grows later. ClearAll() returns every tree and
  *   stump to its pool. Resource rounds should call these; spawnOnStart covers testing until the round
  *   state machine exists.
  * - Trees and stumps come from ComponentPools built from the prefabs (prewarmed), never
@@ -30,6 +32,8 @@ public class TreeSpawner : MonoBehaviour
     [SerializeField, Min(1f)] private float areaRadius = 40f;
     [SerializeField, Min(0f)] private float clearRadius = 8f;
     [SerializeField, Min(0f)] private float minSpacing = 5f;
+    [Tooltip("A tree spot must be open ground (no base layout cells) within this radius, so canopies stay off the walls.")]
+    [SerializeField, Min(0f)] private float layoutClearance = 2f;
     [SerializeField] private Vector2 scaleRange = new Vector2(0.9f, 1.15f);
 
     private readonly List<ResourceTree> liveTrees = new List<ResourceTree>();
@@ -108,7 +112,7 @@ public class TreeSpawner : MonoBehaviour
                 }
 
                 Vector3 point = center + new Vector3(offset.x, 0f, offset.y);
-                if (IsFarFromSpots(point, sqrSpacing))
+                if (IsFarFromSpots(point, sqrSpacing) && BuildGrid.IsOpenGroundAt(point, layoutClearance))
                 {
                     spots.Add(point);
                     break;
