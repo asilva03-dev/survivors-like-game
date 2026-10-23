@@ -122,7 +122,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
         switch (state)
         {
             case State.Idle:
-                if (attackAction.WasPressedThisFrame() && Time.time >= lockedUntil)
+                if (attackAction.WasPressedThisFrame() && Time.time >= lockedUntil && !PlayerInputGate.AttacksBlocked)
                 {
                     BeginCharge();
                 }

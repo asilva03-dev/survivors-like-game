@@ -8,6 +8,7 @@
  *   red when closed. Doors are read from the painting, so painting path to an edge's door spot opens it.
  * - Size sliders resize the chunk (painting that still fits is kept). Fill paints every cell with the brush, Clear
  *   empties the chunk. Every change supports Undo (Ctrl+Z) and saves with the asset.
+ * - Draft fields (Is Base Chunk, Copies In Pool) are drawn at the top.
  * - Painting mistakes (path on an edge outside a door spot, half-painted doors) are listed as warnings below the grid.
  */
 
@@ -48,6 +49,13 @@ public class WallChunkEditor : Editor
         {
             EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"));
         }
+
+        serializedObject.Update();
+        EditorGUILayout.LabelField("Draft", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("isBaseChunk"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("copiesInPool"));
+        serializedObject.ApplyModifiedProperties();
+        EditorGUILayout.Space();
 
         DrawSize(chunk);
         EditorGUILayout.Space();

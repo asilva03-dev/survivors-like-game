@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea01255453aad0e43a8e53f5796a9c06, type: 3}
+  m_Name: _TestChunkBase9
+  m_EditorClassIdentifier: Assembly-CSharp::WallChunk
+  isBaseChunk: 1
+  copiesInPool: 1
+  modulesX: 1
+  modulesY: 1
+  storedWidth: 12
+  cells: 030302020101010102030303030303020201010102020303030303030302010101010203020303030202020201010102010202020404040401010101010101010404040401010101010101010404040401010101010101010404040402020201020101010202020203030302030201010101020303030303030302010101010202030303030303020101010102020303

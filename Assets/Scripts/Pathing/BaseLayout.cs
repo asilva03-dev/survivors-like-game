@@ -1,21 +1,27 @@
 /*
  * BaseLayout
- * Builds the base's walls from WallChunk presets: a hand-set list of (chunk, slot) placements (the slice-3 draft will
- * add to it later). Lives on the BasePoint object and writes into the BuildGrid.
+ * Builds the base's walls from WallChunk presets placed on a chunk grid of slots, and writes them into the BuildGrid.
+ * Lives on the BasePoint object. The preset draft (PresetDraft + ChunkPlacer) adds chunks at runtime with Place().
  *
  * - Slots are ModuleSize-cell squares on a chunk grid centred on the base: slot (0,0) is the core slot around the base,
- *   +x east, +y north. A chunk bigger than one module also covers the slots east/north of its own slot.
- * - Applying writes every chunk cell into the grid (Path, Wall and BuildStrip as painted; Empty and painted Base become
- *   Blocked), never over the grid's own Base cells, then raises one grid Changed (one flow-field rebuild).
- * - Checks, logged as warnings (the layout still builds): chunk painting problems, chunks overlapping each other or
- *   sticking out of the grid, touching doors that don't match (open against closed), no entrance (no open door facing
- *   empty space), and entrances whose path doesn't lead to the base through the layout (a dead end).
+ *   +x east, +y north. A placement = chunk + slot + rotation (quarter turns clockwise); a chunk bigger than one module
+ *   (after turning) also covers the slots east/north of its own slot. Only slots within maxSlotReach of the core are
+ *   usable, so an open margin is left around the layout for enemies to walk.
+ * - The hand-set `placements` list is a test layout, used only when useTestLayout is on; otherwise a run starts empty.
+ * - Applying writes every chunk cell into the grid (Path, Wall and BuildStrip as painted; Empty stays Free = normal
+ *   walkable ground; painted Base becomes Blocked), never over the grid's own Base cells, marks them all as layout cells
+ *   (keeps spawns off them), then raises one grid Changed (one flow-field rebuild). The placement route checks still
+ *   only follow painted Path, so enemies walking through empty ground is extra, never required.
+ * - Placement rules (CanPlace): the chunk's slots are free and in reach; a base chunk goes only in the core slot of an
+ *   empty layout; any other chunk needs at least one open door against an open door of a placed chunk (other touching
+ *   edges may be anything) and its path must reach the base through such a connection; every entrance (open door
+ *   facing empty space) must lead to the base through the layout's paths (no dead ends), and at least one must remain.
+ *   The same route check gives the warnings for the test layout.
  * - showBlocks covers the Wall cells with as few boxes as possible (greedy rectangles; wallHeight, material) under a
  *   runtime child. Each box keeps its BoxCollider and sits on wallLayer ("Wall"): it blocks the player, player bullets
  *   ignore that layer, enemies are kept out by the grid instead.
  * - In Play, editing the list, painting a placed chunk or rebuilding the grid re-applies the layout on the next frame
- *   (live preview). Selecting the object shows the slot guide (every slot that fits in the grid, labelled with its
- *   coordinates) and the placed chunks as coloured gizmos in the Scene view, also outside Play.
+ *   (live preview). Selecting the object shows the slot guide and the placed chunks as gizmos in the Scene view.
  */
 
 using System;
@@ -32,13 +38,18 @@ public class BaseLayout : MonoBehaviour
         public WallChunk chunk;
         [Tooltip("Slot on the chunk grid: (0,0) = core slot around the base, +x east, +y north.")]
         public Vector2Int slot;
+        [Tooltip("Quarter turns clockwise (seen from above).")]
+        [Range(0, 3)] public int rotation;
     }
 
     private static readonly ChunkSide[] Sides = { ChunkSide.North, ChunkSide.East, ChunkSide.South, ChunkSide.West };
 
     [SerializeField] private BuildGrid grid;
-    [SerializeField] private bool applyOnStart = true;
+    [Tooltip("Build the hand-set placements below on Start (testing). Off = a run starts with an empty layout.")]
+    [SerializeField] private bool useTestLayout;
     [SerializeField] private List<ChunkPlacement> placements = new List<ChunkPlacement>();
+    [Tooltip("Slots up to this many steps from the core (each way) can hold chunks.")]
+    [SerializeField, Min(0)] private int maxSlotReach = 2;
 
     [Header("Wall blocks")]
     [SerializeField] private bool showBlocks = true;
@@ -48,16 +59,23 @@ public class BaseLayout : MonoBehaviour
     [SerializeField] private string wallLayer = "Wall";
 
     private readonly List<Vector2Int> written = new List<Vector2Int>();
-    private readonly HashSet<Vector2Int> writtenSet = new HashSet<Vector2Int>();
     private readonly List<string> warnings = new List<string>();
     private readonly Dictionary<Vector2Int, int> occupied = new Dictionary<Vector2Int, int>();
+    private readonly List<Vector2Int> baseCells = new List<Vector2Int>();
     private Transform blocks;
     private bool applied;
     private bool reapply;
     private int lastVersion;
 
+    /// <summary>Raised after the layout was applied (a chunk placed, the list edited, the grid rebuilt).</summary>
+    public event Action LayoutChanged;
+
     public IReadOnlyList<string> Warnings => warnings;
     public List<ChunkPlacement> Placements => placements;
+    public int MaxSlotReach => maxSlotReach;
+    public float WallHeight => wallHeight;
+    public BuildGrid Grid => grid;
+    public bool HasBaseChunk => placements.Exists(p => p != null && p.chunk != null && p.chunk.IsBaseChunk);
 
     private void Start()
     {
@@ -69,10 +87,11 @@ public class BaseLayout : MonoBehaviour
         {
             grid.Rebuilt += OnGridRebuilt;
         }
-        if (applyOnStart)
+        if (!useTestLayout)
         {
-            Apply();
+            placements = new List<ChunkPlacement>();
         }
+        Apply();
     }
 
     private void OnDestroy()
@@ -87,7 +106,7 @@ public class BaseLayout : MonoBehaviour
     private void OnGridRebuilt()
     {
         written.Clear();
-        writtenSet.Clear();
+        baseCells.Clear();
         if (applied)
         {
             reapply = true;
@@ -122,6 +141,110 @@ public class BaseLayout : MonoBehaviour
         return new Vector2Int(grid.Width / 2 - size / 2 + slot.x * size, grid.Height / 2 - size / 2 + slot.y * size);
     }
 
+    /// <summary>The slot containing a world position.</summary>
+    public Vector2Int SlotAt(Vector3 world)
+    {
+        Vector2Int local = grid.WorldToCell(world) - SlotOrigin(Vector2Int.zero);
+        int size = WallChunk.ModuleSize;
+        return new Vector2Int(Mathf.FloorToInt(local.x / (float)size), Mathf.FloorToInt(local.y / (float)size));
+    }
+
+    /// <summary>World position of a grid cell's minimum corner, on the ground.</summary>
+    public Vector3 CellCorner(Vector2Int cell)
+    {
+        Vector3 origin = grid.Origin;
+        return new Vector3(origin.x + cell.x * grid.CellSize, 0f, origin.z + cell.y * grid.CellSize);
+    }
+
+    public bool InReach(Vector2Int slot)
+    {
+        return Mathf.Abs(slot.x) <= maxSlotReach && Mathf.Abs(slot.y) <= maxSlotReach;
+    }
+
+    /// <summary>The placed chunk covering a slot, or null.</summary>
+    public ChunkPlacement PlacementAt(Vector2Int slot)
+    {
+        int index;
+        return occupied.TryGetValue(slot, out index) ? placements[index] : null;
+    }
+
+    /// <summary>Adds a chunk and rebuilds the layout. Call CanPlace first; this does not check the rules.</summary>
+    public void Place(WallChunk chunk, Vector2Int slot, int rotation)
+    {
+        placements.Add(new ChunkPlacement { chunk = chunk, slot = slot, rotation = rotation & 3 });
+        Apply();
+    }
+
+    /// <summary>Whether the chunk may go at slot/rotation; `reason` says why not (empty when it may).</summary>
+    public bool CanPlace(WallChunk chunk, Vector2Int slot, int rotation, out string reason)
+    {
+        reason = "";
+        if (chunk == null || grid == null)
+        {
+            reason = "Nothing to place.";
+            return false;
+        }
+        rotation &= 3;
+        ChunkPlacement candidate = new ChunkPlacement { chunk = chunk, slot = slot, rotation = rotation };
+
+        if (chunk.IsBaseChunk)
+        {
+            if (slot != Vector2Int.zero || occupied.Count > 0)
+            {
+                reason = "The base chunk goes in the middle of an empty layout.";
+                return false;
+            }
+        }
+        else if (!HasBaseChunk)
+        {
+            reason = "Place the base chunk first.";
+            return false;
+        }
+
+        Dictionary<Vector2Int, ChunkPlacement> layout = CurrentSlots();
+        for (int my = 0; my < chunk.RotatedModulesY(rotation); my++)
+        {
+            for (int mx = 0; mx < chunk.RotatedModulesX(rotation); mx++)
+            {
+                Vector2Int s = slot + new Vector2Int(mx, my);
+                if (!InReach(s))
+                {
+                    reason = "Too far from the base.";
+                    return false;
+                }
+                if (layout.ContainsKey(s))
+                {
+                    reason = "That spot is taken.";
+                    return false;
+                }
+                layout[s] = candidate;
+            }
+        }
+
+        RouteReport report = CheckRoutes(layout, candidate);
+        if (!chunk.IsBaseChunk && report.connections == 0)
+        {
+            reason = "No open door meets an open door of your base.";
+            return false;
+        }
+        if (!chunk.IsBaseChunk && !report.candidateReachesBase)
+        {
+            reason = "Its path doesn't lead to the base.";
+            return false;
+        }
+        if (report.deadEnds > 0)
+        {
+            reason = "An entrance would lead to a dead end.";
+            return false;
+        }
+        if (report.entrances == 0)
+        {
+            reason = "It would seal the base (no way in left).";
+            return false;
+        }
+        return true;
+    }
+
     [ContextMenu("Apply")]
     public void Apply()
     {
@@ -142,6 +265,7 @@ public class BaseLayout : MonoBehaviour
                 continue;
             }
             WallChunk chunk = placement.chunk;
+            int rotation = placement.rotation & 3;
 
             foreach (string problem in chunk.GetProblems())
             {
@@ -155,9 +279,9 @@ public class BaseLayout : MonoBehaviour
 
             int outside = 0;
             Vector2Int origin = SlotOrigin(placement.slot);
-            for (int y = 0; y < chunk.Height; y++)
+            for (int y = 0; y < chunk.RotatedHeight(rotation); y++)
             {
-                for (int x = 0; x < chunk.Width; x++)
+                for (int x = 0; x < chunk.RotatedWidth(rotation); x++)
                 {
                     Vector2Int cell = origin + new Vector2Int(x, y);
                     if (!grid.InBounds(cell))
@@ -169,9 +293,9 @@ public class BaseLayout : MonoBehaviour
                     {
                         continue;
                     }
-                    grid.SetState(cell, ToGridState(chunk.GetCell(x, y)), false);
+                    grid.SetState(cell, ToGridState(chunk.GetCell(x, y, rotation)), false);
+                    grid.SetLayoutCell(cell, true);
                     written.Add(cell);
-                    writtenSet.Add(cell);
                 }
             }
             if (outside > 0)
@@ -183,13 +307,14 @@ public class BaseLayout : MonoBehaviour
         applied = true;
         lastVersion = VersionSum();
         grid.NotifyChanged();
-        CheckDoors();
+        CheckLayout();
         RebuildBlocks();
 
         foreach (string warning in warnings)
         {
             Debug.LogWarning("BaseLayout: " + warning, this);
         }
+        LayoutChanged?.Invoke();
     }
 
     [ContextMenu("Clear")]
@@ -203,6 +328,7 @@ public class BaseLayout : MonoBehaviour
             grid.NotifyChanged();
         }
         RebuildBlocks();
+        LayoutChanged?.Invoke();
     }
 
     private static CellState ToGridState(ChunkCell cell)
@@ -212,7 +338,8 @@ public class BaseLayout : MonoBehaviour
             case ChunkCell.Path: return CellState.Path;
             case ChunkCell.Wall: return CellState.Wall;
             case ChunkCell.BuildStrip: return CellState.BuildStrip;
-            default: return CellState.Blocked;
+            case ChunkCell.Base: return CellState.Blocked;
+            default: return CellState.Free;
         }
     }
 
@@ -220,9 +347,10 @@ public class BaseLayout : MonoBehaviour
     private bool Occupy(int index, ChunkPlacement placement)
     {
         WallChunk chunk = placement.chunk;
-        for (int my = 0; my < chunk.ModulesY; my++)
+        int rotation = placement.rotation & 3;
+        for (int my = 0; my < chunk.RotatedModulesY(rotation); my++)
         {
-            for (int mx = 0; mx < chunk.ModulesX; mx++)
+            for (int mx = 0; mx < chunk.RotatedModulesX(rotation); mx++)
             {
                 Vector2Int slot = placement.slot + new Vector2Int(mx, my);
                 int other;
@@ -235,9 +363,9 @@ public class BaseLayout : MonoBehaviour
             }
         }
 
-        for (int my = 0; my < chunk.ModulesY; my++)
+        for (int my = 0; my < chunk.RotatedModulesY(rotation); my++)
         {
-            for (int mx = 0; mx < chunk.ModulesX; mx++)
+            for (int mx = 0; mx < chunk.RotatedModulesX(rotation); mx++)
             {
                 occupied[placement.slot + new Vector2Int(mx, my)] = index;
             }
@@ -245,115 +373,174 @@ public class BaseLayout : MonoBehaviour
         return true;
     }
 
-    // Matches every door against the chunk it touches; open doors facing empty slots are entrances and must reach the base.
-    private void CheckDoors()
+    private Dictionary<Vector2Int, ChunkPlacement> CurrentSlots()
     {
-        int entrances = 0;
-
+        Dictionary<Vector2Int, ChunkPlacement> slots = new Dictionary<Vector2Int, ChunkPlacement>();
         foreach (KeyValuePair<Vector2Int, int> pair in occupied)
         {
-            int index = pair.Value;
-            ChunkPlacement placement = placements[index];
-            WallChunk chunk = placement.chunk;
-            Vector2Int local = pair.Key - placement.slot;
-
-            foreach (ChunkSide side in Sides)
-            {
-                int door;
-                if (!DoorOnModule(chunk, side, local, out door))
-                {
-                    continue;
-                }
-
-                bool open = chunk.IsDoorOpen(side, door);
-                Vector2Int neighbourSlot = pair.Key + Step(side);
-                int other;
-                if (occupied.TryGetValue(neighbourSlot, out other))
-                {
-                    if (other == index || other < index)
-                    {
-                        continue;
-                    }
-                    ChunkPlacement otherPlacement = placements[other];
-                    ChunkSide facing = Opposite(side);
-                    int otherDoor;
-                    DoorOnModule(otherPlacement.chunk, facing, neighbourSlot - otherPlacement.slot, out otherDoor);
-                    bool otherOpen = otherPlacement.chunk.IsDoorOpen(facing, otherDoor);
-                    if (open != otherOpen)
-                    {
-                        warnings.Add("Door mismatch: " + chunk.name + " " + side + " door is " + (open ? "open" : "closed") +
-                                     " but " + otherPlacement.chunk.name + " " + facing + " door is " +
-                                     (otherOpen ? "open" : "closed") + " (slots " + pair.Key + " / " + neighbourSlot + ").");
-                    }
-                }
-                else if (open)
-                {
-                    entrances++;
-                    if (!DoorReachesBase(placement, side, door))
-                    {
-                        warnings.Add("Entrance " + chunk.name + " " + side + " door (slot " + pair.Key +
-                                     ") leads to a dead end (its path never reaches the base).");
-                    }
-                }
-            }
+            slots[pair.Key] = placements[pair.Value];
         }
+        return slots;
+    }
 
-        if (occupied.Count > 0 && entrances == 0)
+    // Warnings for the applied layout (test layouts are not checked when they are set up by hand).
+    private void CheckLayout()
+    {
+        if (occupied.Count == 0)
+        {
+            return;
+        }
+        RouteReport report = CheckRoutes(CurrentSlots(), null);
+        foreach (string deadEnd in report.deadEndNames)
+        {
+            warnings.Add("Entrance " + deadEnd + " leads to a dead end (its path never reaches the base).");
+        }
+        if (report.entrances == 0)
         {
             warnings.Add("No entrance: no open door faces empty space, so enemies can't get in.");
         }
     }
 
-    // The door index of `side` on the chunk's module at `local`, if that module lies on that side.
-    private static bool DoorOnModule(WallChunk chunk, ChunkSide side, Vector2Int local, out int door)
+    private class RouteReport
     {
-        switch (side)
-        {
-            case ChunkSide.North: door = local.x; return local.y == chunk.ModulesY - 1;
-            case ChunkSide.South: door = local.x; return local.y == 0;
-            case ChunkSide.East: door = local.y; return local.x == chunk.ModulesX - 1;
-            default: door = local.y; return local.x == 0;
-        }
+        public int entrances;
+        public int deadEnds;
+        public int connections;
+        public bool candidateReachesBase;
+        public readonly List<string> deadEndNames = new List<string>();
     }
 
-    // Walks from the door's cells through the layout only (never back outside), so a door that leads into a dead end
-    // counts as unreachable even though enemies could walk around the outside to another door.
-    private bool DoorReachesBase(ChunkPlacement placement, ChunkSide side, int door)
+    // Floods the layout's Path cells from the base cells (never through open ground outside, so a door leading into a
+    // dead end counts as unreachable even though enemies could walk around to another door), then reads every door:
+    // open against open = a connection, open facing empty space = an entrance that must have been reached.
+    private RouteReport CheckRoutes(Dictionary<Vector2Int, ChunkPlacement> layout, ChunkPlacement candidate)
     {
-        Queue<Vector2Int> open = new Queue<Vector2Int>();
-        HashSet<Vector2Int> seen = new HashSet<Vector2Int>();
-        Vector2Int origin = SlotOrigin(placement.slot);
-        for (int i = 0; i < WallChunk.DoorWidth; i++)
+        RouteReport report = new RouteReport();
+        HashSet<Vector2Int> reached = FloodFromBase(layout);
+
+        foreach (KeyValuePair<Vector2Int, ChunkPlacement> pair in layout)
         {
-            Vector2Int cell = origin + placement.chunk.EdgeCell(side, door * WallChunk.ModuleSize + WallChunk.DoorStart + i);
-            if (seen.Add(cell))
+            ChunkPlacement placement = pair.Value;
+            Vector2Int local = pair.Key - placement.slot;
+            foreach (ChunkSide side in Sides)
             {
-                open.Enqueue(cell);
+                int door;
+                if (!DoorOnModule(placement, side, local, out door) ||
+                    !placement.chunk.IsDoorOpen(side, door, placement.rotation & 3))
+                {
+                    continue;
+                }
+
+                ChunkPlacement neighbour;
+                if (layout.TryGetValue(pair.Key + Step(side), out neighbour))
+                {
+                    ChunkSide facing = Opposite(side);
+                    Vector2Int neighbourSlot = pair.Key + Step(side);
+                    int otherDoor;
+                    DoorOnModule(neighbour, facing, neighbourSlot - neighbour.slot, out otherDoor);
+                    if (!neighbour.chunk.IsDoorOpen(facing, otherDoor, neighbour.rotation & 3))
+                    {
+                        continue;
+                    }
+                    if (placement == candidate)
+                    {
+                        report.connections++;
+                        if (DoorReached(placement, side, door, reached))
+                        {
+                            report.candidateReachesBase = true;
+                        }
+                    }
+                }
+                else
+                {
+                    report.entrances++;
+                    if (!DoorReached(placement, side, door, reached))
+                    {
+                        report.deadEnds++;
+                        report.deadEndNames.Add(placement.chunk.name + " " + side + " door (slot " + pair.Key + ")");
+                    }
+                }
+            }
+        }
+        return report;
+    }
+
+    private HashSet<Vector2Int> FloodFromBase(Dictionary<Vector2Int, ChunkPlacement> layout)
+    {
+        if (baseCells.Count == 0)
+        {
+            for (int y = 0; y < grid.Height; y++)
+            {
+                for (int x = 0; x < grid.Width; x++)
+                {
+                    Vector2Int cell = new Vector2Int(x, y);
+                    if (grid.GetState(cell) == CellState.Base)
+                    {
+                        baseCells.Add(cell);
+                    }
+                }
             }
         }
 
+        HashSet<Vector2Int> seen = new HashSet<Vector2Int>(baseCells);
+        Queue<Vector2Int> open = new Queue<Vector2Int>(baseCells);
         while (open.Count > 0)
         {
             Vector2Int cell = open.Dequeue();
             for (int k = 0; k < 4; k++)
             {
                 Vector2Int next = cell + Neighbour4[k];
-                if (!seen.Add(next))
+                if (!seen.Contains(next) && LayoutCell(layout, next) == ChunkCell.Path)
                 {
-                    continue;
-                }
-                CellState state = grid.GetState(next);
-                if (state == CellState.Base)
-                {
-                    return true;
-                }
-                if (state == CellState.Path && writtenSet.Contains(next))
-                {
+                    seen.Add(next);
                     open.Enqueue(next);
                 }
             }
         }
+        return seen;
+    }
+
+    // The painted cell of whichever chunk covers a grid cell (Empty where no chunk is).
+    private ChunkCell LayoutCell(Dictionary<Vector2Int, ChunkPlacement> layout, Vector2Int cell)
+    {
+        int size = WallChunk.ModuleSize;
+        Vector2Int local = cell - SlotOrigin(Vector2Int.zero);
+        Vector2Int slot = new Vector2Int(Mathf.FloorToInt(local.x / (float)size), Mathf.FloorToInt(local.y / (float)size));
+        ChunkPlacement placement;
+        if (!layout.TryGetValue(slot, out placement))
+        {
+            return ChunkCell.Empty;
+        }
+        Vector2Int inChunk = cell - SlotOrigin(placement.slot);
+        return placement.chunk.GetCell(inChunk.x, inChunk.y, placement.rotation & 3);
+    }
+
+    private bool DoorReached(ChunkPlacement placement, ChunkSide side, int door, HashSet<Vector2Int> reached)
+    {
+        Vector2Int origin = SlotOrigin(placement.slot);
+        for (int i = 0; i < WallChunk.DoorWidth; i++)
+        {
+            Vector2Int cell = origin + placement.chunk.EdgeCell(side,
+                door * WallChunk.ModuleSize + WallChunk.DoorStart + i, placement.rotation & 3);
+            if (reached.Contains(cell))
+            {
+                return true;
+            }
+        }
         return false;
+    }
+
+    // The door index of `side` on the (turned) chunk's module at `local`, if that module lies on that side.
+    private static bool DoorOnModule(ChunkPlacement placement, ChunkSide side, Vector2Int local, out int door)
+    {
+        int rotation = placement.rotation & 3;
+        switch (side)
+        {
+            case ChunkSide.North: door = local.x; return local.y == placement.chunk.RotatedModulesY(rotation) - 1;
+            case ChunkSide.South: door = local.x; return local.y == 0;
+            case ChunkSide.East: door = local.y; return local.x == placement.chunk.RotatedModulesX(rotation) - 1;
+            default: door = local.y; return local.x == 0;
+        }
     }
 
     private static readonly Vector2Int[] Neighbour4 =
@@ -390,7 +577,7 @@ public class BaseLayout : MonoBehaviour
         {
             if (placement != null && placement.chunk != null)
             {
-                sum = sum * 31 + placement.chunk.Version;
+                sum = sum * 31 + placement.chunk.Version + placement.rotation * 7;
             }
         }
         return sum;
@@ -406,13 +593,13 @@ public class BaseLayout : MonoBehaviour
                 {
                     grid.SetState(cell, CellState.Free, false);
                 }
+                grid.SetLayoutCell(cell, false);
             }
         }
         written.Clear();
-        writtenSet.Clear();
     }
 
-    // Covers the Wall cells with as few boxes as possible (greedy rectangles), each a cube with a BoxCollider on the
+    // Covers the Wall cells with as few boxes as possible (WallBoxes, greedy rectangles), each a cube with a BoxCollider on the
     // wall layer: blocks the player, ignored by player bullets (Projectile skips the layer).
     private void RebuildBlocks()
     {
@@ -431,66 +618,17 @@ public class BaseLayout : MonoBehaviour
         int layer = LayerMask.NameToLayer(wallLayer);
 
         HashSet<Vector2Int> walls = new HashSet<Vector2Int>();
-        Vector2Int min = written[0];
-        Vector2Int max = written[0];
         foreach (Vector2Int cell in written)
         {
             if (grid.GetState(cell) == CellState.Wall)
             {
                 walls.Add(cell);
-                min = Vector2Int.Min(min, cell);
-                max = Vector2Int.Max(max, cell);
             }
         }
-
-        HashSet<Vector2Int> used = new HashSet<Vector2Int>();
-        for (int y = min.y; y <= max.y; y++)
+        foreach (RectInt box in WallBoxes.Merge(walls))
         {
-            for (int x = min.x; x <= max.x; x++)
-            {
-                Vector2Int start = new Vector2Int(x, y);
-                if (!walls.Contains(start) || used.Contains(start))
-                {
-                    continue;
-                }
-
-                int width = 1;
-                while (IsFreeWall(walls, used, new Vector2Int(x + width, y)))
-                {
-                    width++;
-                }
-                int height = 1;
-                while (RowIsFreeWall(walls, used, x, y + height, width))
-                {
-                    height++;
-                }
-                for (int dy = 0; dy < height; dy++)
-                {
-                    for (int dx = 0; dx < width; dx++)
-                    {
-                        used.Add(new Vector2Int(x + dx, y + dy));
-                    }
-                }
-                CreateBlock(start, width, height, layer);
-            }
+            CreateBlock(box.position, box.width, box.height, layer);
         }
-    }
-
-    private static bool IsFreeWall(HashSet<Vector2Int> walls, HashSet<Vector2Int> used, Vector2Int cell)
-    {
-        return walls.Contains(cell) && !used.Contains(cell);
-    }
-
-    private static bool RowIsFreeWall(HashSet<Vector2Int> walls, HashSet<Vector2Int> used, int x, int y, int width)
-    {
-        for (int dx = 0; dx < width; dx++)
-        {
-            if (!IsFreeWall(walls, used, new Vector2Int(x + dx, y)))
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     private void CreateBlock(Vector2Int start, int width, int height, int layer)
@@ -525,8 +663,10 @@ public class BaseLayout : MonoBehaviour
             {
                 continue;
             }
+            int rotation = placement.rotation & 3;
             Vector3 min = CellCorner(SlotOrigin(placement.slot));
-            Vector3 size = new Vector3(placement.chunk.Width, 0f, placement.chunk.Height) * grid.CellSize;
+            Vector3 size = new Vector3(placement.chunk.RotatedWidth(rotation), 0f, placement.chunk.RotatedHeight(rotation)) *
+                           grid.CellSize;
             Gizmos.DrawWireCube(min + size * 0.5f + Vector3.up * 0.05f, size);
         }
     }
@@ -545,12 +685,13 @@ public class BaseLayout : MonoBehaviour
             {
                 continue;
             }
+            int rotation = placement.rotation & 3;
             Vector2Int origin = SlotOrigin(placement.slot);
-            for (int y = 0; y < placement.chunk.Height; y++)
+            for (int y = 0; y < placement.chunk.RotatedHeight(rotation); y++)
             {
-                for (int x = 0; x < placement.chunk.Width; x++)
+                for (int x = 0; x < placement.chunk.RotatedWidth(rotation); x++)
                 {
-                    ChunkCell value = placement.chunk.GetCell(x, y);
+                    ChunkCell value = placement.chunk.GetCell(x, y, rotation);
                     if (value == ChunkCell.Empty)
                     {
                         continue;
@@ -564,16 +705,14 @@ public class BaseLayout : MonoBehaviour
         }
     }
 
-    // Every slot that fits fully inside the grid, outlined and labelled with its coordinates (Scene view, selected).
+    // Every usable slot (within maxSlotReach), outlined and labelled with its coordinates (Scene view, selected).
     private void DrawSlotGuide()
     {
         int size = WallChunk.ModuleSize;
-        int reachX = (grid.Width / 2 - size / 2) / size;
-        int reachY = (grid.Height / 2 - size / 2) / size;
         Gizmos.color = new Color(1f, 1f, 0.4f, 0.35f);
-        for (int sy = -reachY; sy <= reachY; sy++)
+        for (int sy = -maxSlotReach; sy <= maxSlotReach; sy++)
         {
-            for (int sx = -reachX; sx <= reachX; sx++)
+            for (int sx = -maxSlotReach; sx <= maxSlotReach; sx++)
             {
                 Vector2Int slot = new Vector2Int(sx, sy);
                 Vector3 min = CellCorner(SlotOrigin(slot));
@@ -584,12 +723,6 @@ public class BaseLayout : MonoBehaviour
 #endif
             }
         }
-    }
-
-    private Vector3 CellCorner(Vector2Int cell)
-    {
-        Vector3 origin = grid.Origin;
-        return new Vector3(origin.x + cell.x * grid.CellSize, 0f, origin.z + cell.y * grid.CellSize);
     }
 
     private static Color GizmoColor(ChunkCell value)

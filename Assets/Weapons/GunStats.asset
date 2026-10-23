@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GunStats
   m_EditorClassIdentifier: Assembly-CSharp::GunStats
   attackInterval: 0.4
-  damage: 5
+  damage: 0
   resourceDamageMultiplier: 0.5
   targets: 3
   range: 8

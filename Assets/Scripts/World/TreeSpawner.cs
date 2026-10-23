@@ -5,7 +5,8 @@
  * - SpawnAll() picks up to treeCount random spots inside areaRadius (at least minSpacing apart and
  *   outside clearRadius of the spawner, and on open ground at least layoutClearance from any base layout cell) and
  *   places a tree on each. BaseLayout runs its Start first (execution order), so the walls exist when trees are placed;
- *   trees already standing are not moved if the layout grows later. ClearAll() returns every tree and
+ *   when the layout grows later (BuildGrid Changed), trees and stumps that are no longer on open ground (same
+ *   layoutClearance) are removed without a stump or wood. ClearAll() returns every tree and
  *   stump to its pool. Resource rounds should call these; spawnOnStart covers testing until the round
  *   state machine exists.
  * - Trees and stumps come from ComponentPools built from the prefabs (prewarmed), never
@@ -43,6 +44,7 @@ public class TreeSpawner : MonoBehaviour
     private ComponentPool<ResourceTree> treePool;
     private ComponentPool<Transform> stumpPool;
     private ComponentPool<DebrisBurst> debrisPool;
+    private BuildGrid grid;
 
     private void Awake()
     {
@@ -62,9 +64,43 @@ public class TreeSpawner : MonoBehaviour
 
     private void Start()
     {
+        grid = BuildGrid.Instance;
+        if (grid != null)
+        {
+            grid.Changed += RemoveCoveredTrees;
+        }
         if (spawnOnStart)
         {
             SpawnAll();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (grid != null)
+        {
+            grid.Changed -= RemoveCoveredTrees;
+        }
+    }
+
+    // The base layout grew: trees and stumps under (or too close to) the new chunks go away.
+    private void RemoveCoveredTrees()
+    {
+        for (int i = liveTrees.Count - 1; i >= 0; i--)
+        {
+            if (!grid.IsOpenGround(liveTrees[i].transform.position, layoutClearance))
+            {
+                treePool.Release(liveTrees[i]);
+                liveTrees.RemoveAt(i);
+            }
+        }
+        for (int i = stumps.Count - 1; i >= 0; i--)
+        {
+            if (!grid.IsOpenGround(stumps[i].position, layoutClearance))
+            {
+                stumpPool.Release(stumps[i]);
+                stumps.RemoveAt(i);
+            }
         }
     }
 

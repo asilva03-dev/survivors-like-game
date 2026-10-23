@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea01255453aad0e43a8e53f5796a9c06, type: 3}
   m_Name: _TestChunk3
   m_EditorClassIdentifier: Assembly-CSharp::WallChunk
+  isBaseChunk: 0
+  copiesInPool: 1
   modulesX: 1
   modulesY: 1
   storedWidth: 12

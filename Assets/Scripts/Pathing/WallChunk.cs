@@ -3,8 +3,10 @@
  * One wall preset: a painted grid of cells that BaseLayout writes into the BuildGrid (Create > TD > Wall Chunk).
  *
  * - Size is in modules of ModuleSize x ModuleSize cells (1x1, 2x1, 1x2, 2x2...). modulesX runs east, modulesY north;
- *   cell (0,0) is the chunk's south-west corner. Cells are stored unrotated, so rotation can be added later as a
- *   read-time transform without changing saved chunks.
+ *   cell (0,0) is the chunk's south-west corner. Cells are stored unrotated; the overloads taking `rotation` (quarter
+ *   turns clockwise seen from above, 0-3) read the chunk as if it were turned, in the turned chunk's own coordinates.
+ * - Draft settings: isBaseChunk (offered in the base draft at the start of a run, else in the normal drafts) and
+ *   copiesInPool (how many copies of this chunk the run's draft pool holds; 0 = never offered).
  * - Cell kinds: Path (enemies walk), Wall (blocks enemies and the player), BuildStrip (turrets later; the player can
  *   walk on it, enemies can't), Base (only in the core chunk), Empty (unpainted: the player can walk, enemies can't,
  *   nothing can be built).
@@ -41,6 +43,10 @@ public class WallChunk : ScriptableObject
     public const int DoorWidth = 4;
     public const int DoorStart = (ModuleSize - DoorWidth) / 2;
 
+    [Tooltip("Offered in the base draft at the start of a run (it holds the base); otherwise in the normal drafts.")]
+    [SerializeField] private bool isBaseChunk;
+    [Tooltip("Copies of this chunk in a run's draft pool. A picked copy is used up; 0 = never offered.")]
+    [SerializeField, Min(0)] private int copiesInPool = 1;
     [SerializeField, Range(1, 4)] private int modulesX = 1;
     [SerializeField, Range(1, 4)] private int modulesY = 1;
     [SerializeField, HideInInspector] private int storedWidth;
@@ -53,6 +59,27 @@ public class WallChunk : ScriptableObject
     public int ModulesY => modulesY;
     public int Width => modulesX * ModuleSize;
     public int Height => modulesY * ModuleSize;
+    public bool IsBaseChunk => isBaseChunk;
+    public int CopiesInPool => copiesInPool;
+
+    public int RotatedWidth(int rotation) => (rotation & 1) == 0 ? Width : Height;
+    public int RotatedHeight(int rotation) => (rotation & 1) == 0 ? Height : Width;
+    public int RotatedModulesX(int rotation) => (rotation & 1) == 0 ? modulesX : modulesY;
+    public int RotatedModulesY(int rotation) => (rotation & 1) == 0 ? modulesY : modulesX;
+
+    /// <summary>The cell at (x, y) of the chunk turned `rotation` quarter turns clockwise.</summary>
+    public ChunkCell GetCell(int x, int y, int rotation)
+    {
+        int w = Width;
+        int h = Height;
+        switch (rotation & 3)
+        {
+            case 1: return GetCell(w - 1 - y, x);
+            case 2: return GetCell(w - 1 - x, h - 1 - y);
+            case 3: return GetCell(y, h - 1 - x);
+            default: return GetCell(x, y);
+        }
+    }
 
     private void OnEnable()
     {
@@ -107,21 +134,31 @@ public class WallChunk : ScriptableObject
     /// <summary>Door spots along a side (one per module on that side).</summary>
     public int DoorCount(ChunkSide side)
     {
-        return side == ChunkSide.North || side == ChunkSide.South ? modulesX : modulesY;
+        return DoorCount(side, 0);
+    }
+
+    public int DoorCount(ChunkSide side, int rotation)
+    {
+        return side == ChunkSide.North || side == ChunkSide.South ? RotatedModulesX(rotation) : RotatedModulesY(rotation);
     }
 
     /// <summary>True when every edge cell of that door spot is Path.</summary>
     public bool IsDoorOpen(ChunkSide side, int door)
     {
-        if (door < 0 || door >= DoorCount(side))
+        return IsDoorOpen(side, door, 0);
+    }
+
+    public bool IsDoorOpen(ChunkSide side, int door, int rotation)
+    {
+        if (door < 0 || door >= DoorCount(side, rotation))
         {
             return false;
         }
 
         for (int i = 0; i < DoorWidth; i++)
         {
-            Vector2Int cell = EdgeCell(side, door * ModuleSize + DoorStart + i);
-            if (GetCell(cell.x, cell.y) != ChunkCell.Path)
+            Vector2Int cell = EdgeCell(side, door * ModuleSize + DoorStart + i, rotation);
+            if (GetCell(cell.x, cell.y, rotation) != ChunkCell.Path)
             {
                 return false;
             }
@@ -132,11 +169,17 @@ public class WallChunk : ScriptableObject
     /// <summary>The edge cell at `along` cells from the side's start (west end for N/S, south end for E/W).</summary>
     public Vector2Int EdgeCell(ChunkSide side, int along)
     {
+        return EdgeCell(side, along, 0);
+    }
+
+    /// <summary>EdgeCell in the turned chunk's coordinates.</summary>
+    public Vector2Int EdgeCell(ChunkSide side, int along, int rotation)
+    {
         switch (side)
         {
-            case ChunkSide.North: return new Vector2Int(along, Height - 1);
+            case ChunkSide.North: return new Vector2Int(along, RotatedHeight(rotation) - 1);
             case ChunkSide.South: return new Vector2Int(along, 0);
-            case ChunkSide.East: return new Vector2Int(Width - 1, along);
+            case ChunkSide.East: return new Vector2Int(RotatedWidth(rotation) - 1, along);
             default: return new Vector2Int(0, along);
         }
     }
