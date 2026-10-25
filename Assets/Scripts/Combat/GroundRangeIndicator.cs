@@ -25,6 +25,9 @@ public abstract class GroundRangeIndicator : MonoBehaviour
     protected abstract Vector3 Center { get; }
     protected abstract float Radius { get; }
 
+    // Subclasses return false to hide the circle (e.g. no weapon to show yet).
+    protected virtual bool Visible => true;
+
     protected virtual void Awake()
     {
         line = GetComponent<LineRenderer>();
@@ -38,6 +41,12 @@ public abstract class GroundRangeIndicator : MonoBehaviour
 
     private void LateUpdate()
     {
+        line.enabled = Visible;
+        if (!line.enabled)
+        {
+            return;
+        }
+
         Vector3 center = Center;
         transform.position = new Vector3(center.x, groundHeight, center.z);
 

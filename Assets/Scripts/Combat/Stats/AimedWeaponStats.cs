@@ -67,6 +67,12 @@ public abstract class AimedWeaponStats : WeaponStats
 
     public float DisplacedTurnSpeed => displacedTurnSpeed;
     public override float Range => range;
+
+    // Runtime change for upgrade copies only (see WeaponStats.AddDamage).
+    public void AddRange(float amount)
+    {
+        range = Mathf.Max(0.1f, range + amount);
+    }
     public float SlotClearance => slotClearance;
     public float RingRadius => ringRadius;
     public float TurnSpeed => turnSpeed;

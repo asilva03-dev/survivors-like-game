@@ -6,7 +6,8 @@
  *   different assets on this same component.
  * - Builds its own ComponentPool<Projectile> in Awake from the stats' prefab, prewarmed with
  *   prewarmCount. The pool grows if it runs dry, so shots are never skipped.
- * - The pool root is a separate scene object so projectiles do not move with the player.
+ * - The pool root is a separate scene object so projectiles do not move with the player; it is destroyed with the
+ *   gun (a sold turret).
  * - Projectiles fly in a straight line toward where the target was at fire time.
  * - projectileCount: up to 3 bullets leave side by side (parallel, projectileSpacing apart: 1 = center,
  *   2 = either side of center, 3 = left, center, right). Bullets beyond 3 leave together with them
@@ -27,6 +28,7 @@ public class GunWeapon : AimedWeapon<GunStats>
     private const int StraightLimit = 3;
 
     private ComponentPool<Projectile> pool;
+    private Transform poolRoot;
     private System.Func<Damageable> retarget;
 
     protected override void Awake()
@@ -34,8 +36,17 @@ public class GunWeapon : AimedWeapon<GunStats>
         base.Awake();
         retarget = () => CurrentTarget;
 
-        Transform poolRoot = new GameObject(name + " Projectiles").transform;
+        poolRoot = new GameObject(name + " Projectiles").transform;
         pool = new ComponentPool<Projectile>(Stats.ProjectilePrefab, poolRoot, Stats.PrewarmCount);
+    }
+
+    // The pool lives at the scene root; remove it with the gun (a sold turret), bullets in flight included.
+    protected virtual void OnDestroy()
+    {
+        if (poolRoot != null)
+        {
+            Destroy(poolRoot.gameObject);
+        }
     }
 
     protected override void Fire(Damageable target)

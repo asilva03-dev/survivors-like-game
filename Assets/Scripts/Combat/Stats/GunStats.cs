@@ -44,6 +44,22 @@ public class GunStats : AimedWeaponStats
     private const float MaxHomingTurnSpeed = 1080f;
 
     public int Pierce => pierce;
+
+    // Runtime changes for upgrade copies only (see WeaponStats.AddDamage).
+    public void AddPierce(int amount)
+    {
+        pierce = Mathf.Max(0, pierce + amount);
+    }
+
+    public void AddProjectiles(int amount)
+    {
+        projectileCount = Mathf.Max(1, projectileCount + amount);
+    }
+
+    public void SetHoming(bool on)
+    {
+        homing = on;
+    }
     public bool Homing => homing;
     public float HomingStrength => homingStrength;
     // Degrees per second a homing bullet can turn toward its target (strength 1 = MaxHomingTurnSpeed).

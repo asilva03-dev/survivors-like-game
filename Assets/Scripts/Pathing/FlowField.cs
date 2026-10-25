@@ -1,10 +1,18 @@
 /*
  * FlowField
- * For every walkable cell of the BuildGrid, the direction to walk to reach the base by the shortest route.
+ * For every walkable cell of the BuildGrid, the direction an enemy walks to reach the base: outside the base
+ * layout toward its nearest entrance, inside it along the corridor to the base (user's rule, 2026-10-24).
  *
- * - Dijkstra from all Base cells outward over walkable cells (Free/Path), 8 neighbours (straight step cost 10,
- *   diagonal 14), never stepping diagonally past an unwalkable corner. Each reachable cell then points at its
- *   neighbour with the lowest distance. Base cells and cells with no route to the base have no direction (zero).
+ * - Inside pass: Dijkstra from all Base cells over walkable layout cells only (the placed chunks' path and open
+ *   ground), 8 neighbours (straight step cost 10, diagonal 14), never stepping diagonally past an unwalkable corner.
+ *   Inside cells point at their inside neighbour closest to the base, so enemies never leave to take a shortcut.
+ * - Entrances = inside cells (with a route to the base) touching an outside cell. Outside = every other walkable
+ *   cell (open ground, and layout pockets with no route to the base).
+ * - Outside pass: Dijkstra from every entrance over outside cells; each outside cell points toward its nearest
+ *   entrance by walking distance, however long the corridor behind it is.
+ * - GetDistance = how far an enemy there still walks: inside = corridor distance; outside = walk to its entrance +
+ *   that entrance's corridor distance (turrets rank targets by it). Cells with no route have no direction (zero).
+ * - Before any chunk is placed the base cells are the only entrances, so everything walks straight to the base.
  * - Wall avoidance: entering a cell within wallAvoidRange cells of a Wall/BuildStrip/Blocked cell (8-way, so corners count)
  *   costs wallAvoidCost extra (less the farther it is), so routes keep off walls and corners: in an opening the
  *   edge lanes point diagonally into the middle lanes. 0 cost = pure shortest path.
@@ -42,6 +50,8 @@ public class FlowField : MonoBehaviour
 
     private int[] extraCosts;
     private int[] distances;
+    private int[] inside;
+    private int[] walk;
     private Vector2[] directions;
     private readonly List<long> heap = new List<long>();
 
@@ -99,26 +109,32 @@ public class FlowField : MonoBehaviour
         int width = grid.Width;
         int height = grid.Height;
         int count = width * height;
-        if (distances == null || distances.Length != count)
+        if (distances == null || distances.Length != count || inside == null || walk == null)
         {
             distances = new int[count];
+            inside = new int[count];
+            walk = new int[count];
             directions = new Vector2[count];
             extraCosts = new int[count];
         }
 
         ComputeWallCosts(width, height);
+
+        // Pass 1 (inside): corridor distance to the base, over the base cells and walkable layout cells only.
         heap.Clear();
         for (int i = 0; i < count; i++)
         {
             directions[i] = Vector2.zero;
+            walk[i] = Unreachable;
+            distances[i] = Unreachable;
             if (grid.GetState(new Vector2Int(i % width, i / width)) == CellState.Base)
             {
-                distances[i] = 0;
+                inside[i] = 0;
                 Push(0, i);
             }
             else
             {
-                distances[i] = Unreachable;
+                inside[i] = Unreachable;
             }
         }
 
@@ -127,7 +143,7 @@ public class FlowField : MonoBehaviour
             long top = Pop();
             int distance = (int)(top >> 32);
             int index = (int)(top & 0xffffffff);
-            if (distance > distances[index])
+            if (distance > inside[index])
             {
                 continue;
             }
@@ -136,33 +152,96 @@ public class FlowField : MonoBehaviour
             for (int k = 0; k < Neighbours.Length; k++)
             {
                 Vector2Int next = cell + Neighbours[k];
-                if (!grid.IsWalkable(next) || !CanStep(cell, Neighbours[k]))
+                if (!grid.IsWalkable(next) || !grid.IsLayoutCell(next) || !CanStep(cell, Neighbours[k]))
                 {
                     continue;
                 }
 
                 int nextIndex = next.y * width + next.x;
                 int nextDistance = distance + (k < 4 ? StraightCost : DiagonalCost) + extraCosts[nextIndex];
-                if (nextDistance < distances[nextIndex])
+                if (nextDistance < inside[nextIndex])
                 {
-                    distances[nextIndex] = nextDistance;
+                    inside[nextIndex] = nextDistance;
                     Push(nextDistance, nextIndex);
                 }
             }
         }
 
-        MaxDistance = 0;
+        // Pass 2 (outside): walking distance to the nearest entrance = an inside cell touching an outside cell.
+        // Outside = every walkable cell with no inside route (open ground, and layout pockets that can't reach the
+        // base). distances[] for an outside cell = walk + the corridor distance of the entrance it leads to.
+        heap.Clear();
         for (int i = 0; i < count; i++)
         {
-            int distance = distances[i];
-            if (distance == 0 || distance == Unreachable)
+            if (inside[i] == Unreachable)
             {
                 continue;
             }
 
-            MaxDistance = Mathf.Max(MaxDistance, distance);
+            distances[i] = inside[i];
             Vector2Int cell = new Vector2Int(i % width, i / width);
-            int best = distance;
+            for (int k = 0; k < Neighbours.Length; k++)
+            {
+                if (IsOutside(cell + Neighbours[k]) && CanStep(cell, Neighbours[k]))
+                {
+                    walk[i] = 0;
+                    Push(0, i);
+                    break;
+                }
+            }
+        }
+
+        while (heap.Count > 0)
+        {
+            long top = Pop();
+            int distance = (int)(top >> 32);
+            int index = (int)(top & 0xffffffff);
+            if (distance > walk[index])
+            {
+                continue;
+            }
+
+            int corridor = distances[index] - distance;
+            Vector2Int cell = new Vector2Int(index % width, index / width);
+            for (int k = 0; k < Neighbours.Length; k++)
+            {
+                Vector2Int next = cell + Neighbours[k];
+                if (!IsOutside(next) || !CanStep(cell, Neighbours[k]))
+                {
+                    continue;
+                }
+
+                int nextIndex = next.y * width + next.x;
+                int nextWalk = distance + (k < 4 ? StraightCost : DiagonalCost) + extraCosts[nextIndex];
+                if (nextWalk < walk[nextIndex])
+                {
+                    walk[nextIndex] = nextWalk;
+                    distances[nextIndex] = nextWalk + corridor;
+                    Push(nextWalk, nextIndex);
+                }
+            }
+        }
+
+        // Directions: inside cells step to the inside neighbour closest to the base (never back out); outside cells
+        // step to the neighbour closest to an entrance (entrances have walk 0).
+        MaxDistance = 0;
+        for (int i = 0; i < count; i++)
+        {
+            bool isInside = inside[i] != Unreachable;
+            int[] field = isInside ? inside : walk;
+            int own = field[i];
+            if (distances[i] != Unreachable)
+            {
+                MaxDistance = Mathf.Max(MaxDistance, distances[i]);
+            }
+
+            if (own == Unreachable || own == 0)
+            {
+                continue;
+            }
+
+            Vector2Int cell = new Vector2Int(i % width, i / width);
+            int best = own;
             Vector2Int bestStep = Vector2Int.zero;
             for (int k = 0; k < Neighbours.Length; k++)
             {
@@ -172,10 +251,10 @@ public class FlowField : MonoBehaviour
                     continue;
                 }
 
-                int nextDistance = distances[next.y * width + next.x];
-                if (nextDistance < best)
+                int nextValue = field[next.y * width + next.x];
+                if (nextValue < best)
                 {
-                    best = nextDistance;
+                    best = nextValue;
                     bestStep = Neighbours[k];
                 }
             }
@@ -184,6 +263,11 @@ public class FlowField : MonoBehaviour
         }
 
         Rebuilt?.Invoke();
+    }
+
+    private bool IsOutside(Vector2Int cell)
+    {
+        return grid.IsWalkable(cell) && inside[cell.y * grid.Width + cell.x] == Unreachable;
     }
 
     // Extra cost per cell from its distance to the nearest wall (Chebyshev, so diagonal corners count):
@@ -241,7 +325,7 @@ public class FlowField : MonoBehaviour
         return grid.IsWalkable(cell) || grid.GetState(cell) == CellState.Base;
     }
 
-    /// <summary>Distance to the base in cost units (10 per straight step), or Unreachable.</summary>
+    /// <summary>Remaining walk to the base along the field's route in cost units (10 per straight step), or Unreachable.</summary>
     public int GetDistance(Vector2Int cell)
     {
         return distances != null && grid.InBounds(cell) ? distances[cell.y * grid.Width + cell.x] : Unreachable;

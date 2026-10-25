@@ -50,6 +50,15 @@ public abstract class WeaponBase<TStats> : WeaponBase where TStats : WeaponStats
 
     protected abstract void Tick();
 
+    // Swaps in another stats object at runtime (turret upgrades use a per-turret copy). Not for shared assets.
+    protected void ReplaceStats(TStats replacement)
+    {
+        if (replacement != null)
+        {
+            stats = replacement;
+        }
+    }
+
     protected void StartCooldown()
     {
         cooldown = Mathf.Max(stats.AttackInterval, 0.01f);

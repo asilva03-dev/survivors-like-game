@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 873fca6e5380d5d40b7f449266bb418e, type: 3}
+  m_Name: TurretGunStats
+  m_EditorClassIdentifier: Assembly-CSharp::GunStats
+  attackInterval: 0.6
+  damage: 4
+  resourceDamageMultiplier: 0
+  targets: 1
+  range: 9
+  ringRadius: 0
+  turnSpeed: 360
+  fireAngleTolerance: 10
+  slotClearance: 1.5
+  displacedTurnSpeed: 400
+  separationDistance: 0.8
+  focusWeakestResource: 0
+  avoidCloseRange: 0
+  preferFarTargets: 0
+  stickyTargets: 0
+  useRing: 0
+  claimsTargets: 0
+  preferClusters: 0
+  clusterRadius: 2.5
+  projectilePrefab: {fileID: 962566158592359736, guid: bc85c3b6d43932c4aacf34d196f642c1, type: 3}
+  prewarmCount: 20
+  projectileSpeed: 20
+  lifetime: 2
+  muzzleOffset: 1.6800001
+  projectileCount: 1
+  projectileSpacing: 0.3
+  curveStartAngle: 50
+  curveAngleStep: 25
+  curveTurnSpeed: 240
+  pierce: 0
+  homing: 0
+  homingStrength: 0.5

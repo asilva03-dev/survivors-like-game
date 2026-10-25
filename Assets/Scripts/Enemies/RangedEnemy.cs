@@ -1,6 +1,6 @@
 /*
  * RangedEnemy
- * Enemy that walks toward its target (the player or the base, whichever is closer; see Enemy.Target), stands
+ * Enemy that walks toward its target (a hunter: always the player, see Enemy.Target and EnemyStats focus), stands
  * still and shoots once the target is within range, and now and then walks a bit closer. All numbers come from a RangedEnemyStats asset (set as the Enemy's Stats) (range, fire interval, projectile
  * speed / lifetime / damage / count, how often it advances).
  *
@@ -13,6 +13,7 @@
  *   actually stood still (below StillSpeed) for SettleTime, so after an Advance it must come to a full stop
  *   first, and being pushed by a crowd or knocked back holds fire until it settles. The fire timer keeps
  *   counting meanwhile, so the volley goes off as soon as it is still.
+ * - While its Target is null (a hunter whose player is in the light, see Enemy) it holds fire and walks (Approach).
  * - Walking itself is EnemyMovementSystem's (seek + separation); this class only says whether the enemy wants
  *   to move (WantsToMove), so it always keeps its spacing from neighbours even while standing.
  * - A volley leaves the Muzzle transform (a child of Visual placed at the gun on the model, so it turns with
@@ -65,8 +66,11 @@ public class RangedEnemy : Enemy
     {
         base.Update();
 
+        // No target = a hunter holding fire while the player is in the light (it walks to the edge, then away).
         if (Target == null)
         {
+            state = State.Approach;
+            previousPosition = transform.position;
             return;
         }
 

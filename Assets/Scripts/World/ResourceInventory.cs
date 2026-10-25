@@ -5,7 +5,8 @@
  * - Wood is added when a WoodDrop is collected (WoodDrop.Collected), not when the tree dies.
  *   WoodDropSpawner creates the drops from ResourceTree.WoodYield.
  * - WoodChanged fires with the new total for UI (see WoodCounterUI).
- * - TrySpend(amount) is for the base store later; it only spends what is available.
+ * - TrySpend(amount) spends wood for building (only what is available); AddWood(amount) adds directly (debug key,
+ *   sell refunds).
  */
 
 using System;
@@ -33,6 +34,18 @@ public class ResourceInventory : MonoBehaviour
         wood -= amount;
         WoodChanged?.Invoke(wood);
         return true;
+    }
+
+    // Direct add (debug wood key, later refunds from selling).
+    public void AddWood(int amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        wood += amount;
+        WoodChanged?.Invoke(wood);
     }
 
     private void HandleCollected(int amount)

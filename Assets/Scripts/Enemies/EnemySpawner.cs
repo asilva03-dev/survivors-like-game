@@ -1,23 +1,27 @@
 /*
  * EnemySpawner
- * Pooled enemy spawner that places enemies just off-screen and lets them walk in, Vampire
- * Survivors style.
+ * Pooled enemy spawner and (until the round state machine exists) the spawn director of TD slice 4: one continuous
+ * spawn stream (spawnsPerSecond, cap maxEnemies) split between the base and the player.
  *
  * - Enemies come from ComponentPools built from enemyPrefab (normal) and rangedEnemyPrefab (prewarmed), never
- *   Instantiate/Destroy at runtime. Each spawn picks the ranged type with probability rangedChance (0.2 = an
- *   80/20 mix on average), else the normal one. Dead enemies are returned to the pool they came from via
- *   Damageable.Died.
- * - Spawn rate (spawnsPerSecond) and the cap (maxEnemies) throttle spawning. If the cap is reached
- *   the timer holds, so there is no burst once enemies die.
+ *   Instantiate/Destroy at runtime. Dead enemies return to the pool they came from via Damageable.Died, and hunters
+ *   that retreated off-screen via Enemy.DespawnRequested (no death).
+ * - Split: each spawn goes to the player with probability PlayerShare, else to the base. PlayerShare is 0 while the
+ *   player is in the BaseLight; in the dark it rises from playerShareMin to playerShareMax over playerShareRampTime
+ *   seconds and resets when the player returns to the light. No BaseLight = always the dark.
+ * - Player share: spawned at an off-screen spot around the player (minSpawnDistance, stepping outward) that is also
+ *   at least lightClearance outside the light; rangedChance of them are ranged rats (hunters), the rest basic rats
+ *   assigned to the player (Enemy.Assignment). Ranged rats only ever come from this share.
+ * - Base share: a basic rat assigned to the base, spawned off-screen in a ring just outside the light
+ *   (light TargetRadius + baseSpawnGap + up to baseSpawnBand, stepping outward when a try is visible).
+ * - Every spot must also be open ground outside the base layout (BuildGrid.IsOpenGroundAt within groundClearance)
+ *   and on the map (mapHalfSize around the light's centre). If no try passes, the last spot is used (the movement
+ *   system frees an enemy that lands in a wall).
+ * - Recycling: player-assigned enemies farther than recycleDistance from the player are teleported to a fresh
+ *   player-share spot (biased within aheadAngle of the player's movement). Base-bound enemies are never recycled
+ *   (they are walking to the base) and retreating hunters despawn on their own.
  * - SpawnsEnabled pauses/resumes spawning (the timer resets, so no burst on resume) and raises
  *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
- * - A spawn point is a random spot at least minSpawnDistance from the player that is also outside the
- *   camera view (plus offscreenMargin in viewport units). If the first try is visible, the radius
- *   steps outward until it is not. Raise minSpawnDistance if enemies ever appear on screen. The spot must also be
- *   open ground outside the base layout (BuildGrid.IsOpenGroundAt within groundClearance), so enemies never appear
- *   inside the walls. If no try passes, the last spot is used (the movement system frees an enemy that lands in a wall).
- * - Enemies farther than recycleDistance are teleported to a fresh off-screen spot, biased within
- *   aheadAngle degrees of the player's movement direction, instead of being destroyed.
  * - The player is found by the "Player" tag; the camera is Camera.main.
  */
 
@@ -31,17 +35,35 @@ public class EnemySpawner : MonoBehaviour
 
     [SerializeField] private Enemy enemyPrefab;
     [SerializeField] private Enemy rangedEnemyPrefab;
+    [Tooltip("Share of the player's spawns that are ranged rats (hunters). Ranged rats never come from the base share.")]
     [SerializeField, Range(0f, 1f)] private float rangedChance = 0.2f;
     [SerializeField, Min(0)] private int rangedPrewarmCount = 10;
     [SerializeField, Min(0.1f)] private float spawnsPerSecond = 2f;
     [SerializeField, Min(1)] private int maxEnemies = 30;
     [SerializeField, Min(1)] private int prewarmCount = 30;
+
+    [Header("Split")]
+    [Tooltip("Share of spawns that come for the player the moment they leave the light.")]
+    [SerializeField, Range(0f, 1f)] private float playerShareMin = 0.3f;
+    [Tooltip("Share reached after playerShareRampTime seconds in the dark.")]
+    [SerializeField, Range(0f, 1f)] private float playerShareMax = 0.7f;
+    [SerializeField, Min(0.01f)] private float playerShareRampTime = 20f;
+
+    [Header("Spots")]
     [SerializeField, Min(1f)] private float minSpawnDistance = 14f;
     [SerializeField, Min(1f)] private float recycleDistance = 30f;
     [SerializeField, Range(0f, 0.5f)] private float offscreenMargin = 0.1f;
     [SerializeField, Range(0f, 180f)] private float aheadAngle = 60f;
     [Tooltip("A spawn spot must be open ground (no base layout cells) within this radius.")]
     [SerializeField, Min(0f)] private float groundClearance = 0.6f;
+    [Tooltip("Player-share spots must be at least this far outside the base light's edge.")]
+    [SerializeField, Min(0f)] private float lightClearance = 2f;
+    [Tooltip("Base-share spots start this far outside the light's edge...")]
+    [SerializeField, Min(0f)] private float baseSpawnGap = 2f;
+    [Tooltip("...and spread over this much more.")]
+    [SerializeField, Min(0f)] private float baseSpawnBand = 4f;
+    [Tooltip("Spots must stay within this half size around the light's centre (the ground is 200x200).")]
+    [SerializeField, Min(1f)] private float mapHalfSize = 98f;
 
     private readonly Dictionary<Enemy, ComponentPool<Enemy>> alive = new Dictionary<Enemy, ComponentPool<Enemy>>();
     private readonly List<Enemy> scratch = new List<Enemy>();
@@ -52,9 +74,15 @@ public class EnemySpawner : MonoBehaviour
     private Rigidbody playerBody;
     private Camera cam;
     private float spawnTimer;
+    private float darkTime;
     private bool spawnsEnabled = true;
 
     public event System.Action<bool> SpawnsEnabledChanged;
+
+    /// <summary>Chance that the next spawn comes for the player (0 while the player is in the light).</summary>
+    public float PlayerShare { get; private set; }
+    public float DarkTime => darkTime;
+    public int AliveCount => alive.Count;
 
     public bool SpawnsEnabled
     {
@@ -82,9 +110,17 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private void OnEnable() => Damageable.Died += HandleDied;
+    private void OnEnable()
+    {
+        Damageable.Died += HandleDied;
+        Enemy.DespawnRequested += HandleDespawn;
+    }
 
-    private void OnDisable() => Damageable.Died -= HandleDied;
+    private void OnDisable()
+    {
+        Damageable.Died -= HandleDied;
+        Enemy.DespawnRequested -= HandleDespawn;
+    }
 
     private void Start()
     {
@@ -110,6 +146,7 @@ public class EnemySpawner : MonoBehaviour
             cam = Camera.main;
         }
 
+        UpdateShare();
         float interval = 1f / spawnsPerSecond;
 
         if (!spawnsEnabled)
@@ -136,16 +173,45 @@ public class EnemySpawner : MonoBehaviour
         RecycleFarEnemies();
     }
 
+    private void UpdateShare()
+    {
+        BaseLight baseLight = BaseLight.Instance;
+        bool inDark = baseLight == null || !baseLight.IsPlayerInside;
+        darkTime = inDark ? darkTime + Time.deltaTime : 0f;
+        PlayerShare = inDark
+            ? Mathf.Lerp(playerShareMin, playerShareMax, darkTime / playerShareRampTime)
+            : 0f;
+    }
+
     private void Spawn()
     {
-        ComponentPool<Enemy> source = rangedPool != null && Random.value < rangedChance ? rangedPool : pool;
-        Enemy enemy = source.Get(FindSpawnPoint(false), Quaternion.identity);
-        alive.Add(enemy, source);
+        if (Random.value < PlayerShare)
+        {
+            bool ranged = rangedPool != null && Random.value < rangedChance;
+            ComponentPool<Enemy> source = ranged ? rangedPool : pool;
+            Enemy hunter = source.Get(FindPlayerSpawnPoint(false), Quaternion.identity);
+            hunter.Assignment = EnemyAssignment.Player;
+            alive.Add(hunter, source);
+            return;
+        }
+
+        Enemy enemy = pool.Get(FindBaseSpawnPoint(), Quaternion.identity);
+        enemy.Assignment = EnemyAssignment.Base;
+        alive.Add(enemy, pool);
     }
 
     private void HandleDied(Damageable target)
     {
-        Enemy enemy = target as Enemy;
+        Release(target as Enemy);
+    }
+
+    private void HandleDespawn(Enemy enemy)
+    {
+        Release(enemy);
+    }
+
+    private void Release(Enemy enemy)
+    {
         ComponentPool<Enemy> source;
         if (enemy != null && alive.TryGetValue(enemy, out source))
         {
@@ -161,6 +227,10 @@ public class EnemySpawner : MonoBehaviour
 
         foreach (Enemy enemy in alive.Keys)
         {
+            if (enemy.Assignment != EnemyAssignment.Player || enemy.IsRetreating)
+            {
+                continue;
+            }
             Vector3 offset = enemy.transform.position - player.position;
             offset.y = 0f;
             if (offset.sqrMagnitude > sqrRecycle)
@@ -171,15 +241,14 @@ public class EnemySpawner : MonoBehaviour
 
         for (int i = 0; i < scratch.Count; i++)
         {
-            scratch[i].transform.position = FindSpawnPoint(true);
+            scratch[i].transform.position = FindPlayerSpawnPoint(true);
         }
     }
 
-    private Vector3 FindSpawnPoint(bool preferAhead)
+    // Off-screen ring around the player, outside the light.
+    private Vector3 FindPlayerSpawnPoint(bool preferAhead)
     {
         Vector3 center = player.position;
-        float height = enemyPrefab.transform.position.y;
-
         Vector3 velocity = playerBody != null ? playerBody.linearVelocity : Vector3.zero;
         velocity.y = 0f;
         bool useAhead = preferAhead && velocity.sqrMagnitude > 0.01f;
@@ -191,19 +260,64 @@ public class EnemySpawner : MonoBehaviour
             float yaw = useAhead
                 ? aheadYaw + Random.Range(-aheadAngle, aheadAngle)
                 : Random.Range(0f, 360f);
-            float radius = minSpawnDistance + attempt * AttemptRadiusStep;
-            float radians = yaw * Mathf.Deg2Rad;
-
-            point = center + new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians)) * radius;
-            point.y = height;
-
-            if (IsOffscreen(point) && BuildGrid.IsOpenGroundAt(point, groundClearance))
+            point = OnRing(center, yaw, minSpawnDistance + attempt * AttemptRadiusStep);
+            if (IsGoodSpot(point, true))
             {
                 return point;
             }
         }
 
         return point;
+    }
+
+    // Off-screen ring just outside the light, around its centre.
+    private Vector3 FindBaseSpawnPoint()
+    {
+        BaseLight baseLight = BaseLight.Instance;
+        if (baseLight == null)
+        {
+            return FindPlayerSpawnPoint(false);
+        }
+
+        Vector3 point = baseLight.Center;
+        for (int attempt = 0; attempt < SpawnAttempts; attempt++)
+        {
+            float radius = baseLight.TargetRadius + baseSpawnGap + Random.Range(0f, baseSpawnBand)
+                + attempt * AttemptRadiusStep;
+            point = OnRing(baseLight.Center, Random.Range(0f, 360f), radius);
+            if (IsGoodSpot(point, false))
+            {
+                return point;
+            }
+        }
+
+        return point;
+    }
+
+    private Vector3 OnRing(Vector3 center, float yawDegrees, float radius)
+    {
+        float radians = yawDegrees * Mathf.Deg2Rad;
+        Vector3 point = center + new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians)) * radius;
+        point.y = enemyPrefab.transform.position.y;
+        return point;
+    }
+
+    private bool IsGoodSpot(Vector3 point, bool outsideLight)
+    {
+        BaseLight baseLight = BaseLight.Instance;
+        if (baseLight != null)
+        {
+            Vector3 offset = point - baseLight.Center;
+            if (Mathf.Abs(offset.x) > mapHalfSize || Mathf.Abs(offset.z) > mapHalfSize)
+            {
+                return false;
+            }
+            if (outsideLight && baseLight.Contains(point, lightClearance))
+            {
+                return false;
+            }
+        }
+        return IsOffscreen(point) && BuildGrid.IsOpenGroundAt(point, groundClearance);
     }
 
     private bool IsOffscreen(Vector3 point)

@@ -1,14 +1,17 @@
 /*
  * TreeSpawner
- * Scatters pooled trees around the spawner, replaces dead trees with stumps and regrows them later.
+ * Scatters pooled trees over the map (a share inside the base light) and replaces dead trees with stumps.
  *
- * - SpawnAll() picks up to treeCount random spots inside areaRadius (at least minSpacing apart and
- *   outside clearRadius of the spawner, and on open ground at least layoutClearance from any base layout cell) and
- *   places a tree on each. BaseLayout runs its Start first (execution order), so the walls exist when trees are placed;
- *   when the layout grows later (BuildGrid Changed), trees and stumps that are no longer on open ground (same
- *   layoutClearance) are removed without a stump or wood. ClearAll() returns every tree and
- *   stump to its pool. Resource rounds should call these; spawnOnStart covers testing until the round
- *   state machine exists.
+ * - SpawnAll() places treeCount trees over the square map area (areaHalfSize around the spawner): lightShare of them
+ *   inside the BaseLight circle (its TargetRadius), the rest outside it in the dark. Every spot is at least minSpacing
+ *   from other trees/stumps and on open ground at least layoutClearance from any base layout cell. Light spots that
+ *   don't fit (the early light is small) go to the dark instead, so the total stays treeCount.
+ * - SpawnRound(count) adds trees for a tree round (roundLightShare in the light) without clearing the others.
+ * - The light growing over trees does nothing to them. When the layout grows (BuildGrid Changed), trees and stumps
+ *   that are no longer on open ground (same layoutClearance) are removed without a stump or wood.
+ * - spawnOnStart spawns once the base chunk is placed (waitForBaseChunk; the run starts with the base draft), so the
+ *   light's size is known. ClearAll() returns every tree and stump to its pool. The round state machine should call
+ *   SpawnAll/SpawnRound later.
  * - Trees and stumps come from ComponentPools built from the prefabs (prewarmed), never
  *   Instantiate/Destroy at runtime.
  * - When a tree dies (Damageable.Died) it is released and a stump takes its spot. Stumps persist until
@@ -29,9 +32,16 @@ public class TreeSpawner : MonoBehaviour
     [SerializeField] private Transform stumpPrefab;
     [SerializeField] private DebrisBurst debrisPrefab;
     [SerializeField] private bool spawnOnStart = true;
+    [Tooltip("Wait for the base chunk to be placed before the start spawn (the base draft opens on Play).")]
+    [SerializeField] private bool waitForBaseChunk = true;
+    [SerializeField] private BaseLayout layout;
     [SerializeField, Min(1)] private int treeCount = 25;
-    [SerializeField, Min(1f)] private float areaRadius = 40f;
-    [SerializeField, Min(0f)] private float clearRadius = 8f;
+    [Tooltip("Trees spawn inside a square of this half size around the spawner (the map).")]
+    [SerializeField, Min(1f)] private float areaHalfSize = 95f;
+    [Tooltip("Share of SpawnAll's trees placed inside the base light.")]
+    [SerializeField, Range(0f, 1f)] private float lightShare = 0.1f;
+    [Tooltip("Share of SpawnRound's trees placed inside the base light.")]
+    [SerializeField, Range(0f, 1f)] private float roundLightShare = 0.05f;
     [SerializeField, Min(0f)] private float minSpacing = 5f;
     [Tooltip("A tree spot must be open ground (no base layout cells) within this radius, so canopies stay off the walls.")]
     [SerializeField, Min(0f)] private float layoutClearance = 2f;
@@ -45,6 +55,10 @@ public class TreeSpawner : MonoBehaviour
     private ComponentPool<Transform> stumpPool;
     private ComponentPool<DebrisBurst> debrisPool;
     private BuildGrid grid;
+    private bool spawnPending;
+
+    public int LiveTreeCount => liveTrees.Count;
+    public IReadOnlyList<ResourceTree> LiveTrees => liveTrees;
 
     private void Awake()
     {
@@ -69,8 +83,18 @@ public class TreeSpawner : MonoBehaviour
         {
             grid.Changed += RemoveCoveredTrees;
         }
-        if (spawnOnStart)
+        if (layout == null)
         {
+            layout = FindAnyObjectByType<BaseLayout>();
+        }
+        spawnPending = spawnOnStart;
+    }
+
+    private void Update()
+    {
+        if (spawnPending && (!waitForBaseChunk || layout == null || layout.HasBaseChunk))
+        {
+            spawnPending = false;
             SpawnAll();
         }
     }
@@ -107,9 +131,46 @@ public class TreeSpawner : MonoBehaviour
     public void SpawnAll()
     {
         ClearAll();
-        PickSpots();
+        Spawn(treeCount, lightShare);
+    }
 
-        for (int i = 0; i < spots.Count; i++)
+    /// <summary>Adds count trees (a tree round), roundLightShare of them in the light; existing trees stay.</summary>
+    public void SpawnRound(int count)
+    {
+        Spawn(count, roundLightShare);
+    }
+
+    private void Spawn(int count, float share)
+    {
+        spots.Clear();
+        for (int i = 0; i < liveTrees.Count; i++)
+        {
+            spots.Add(liveTrees[i].transform.position);
+        }
+        for (int i = 0; i < stumps.Count; i++)
+        {
+            spots.Add(stumps[i].position);
+        }
+        int first = spots.Count;
+
+        BaseLight baseLight = BaseLight.Instance;
+        float lightRadius = baseLight != null ? baseLight.TargetRadius : 0f;
+        int lightCount = baseLight != null ? Mathf.RoundToInt(count * share) : 0;
+        int placedLight = 0;
+        for (int i = 0; i < lightCount; i++)
+        {
+            if (TryPickSpot(true, lightRadius, baseLight))
+            {
+                placedLight++;
+            }
+        }
+        int darkCount = count - placedLight;
+        for (int i = 0; i < darkCount; i++)
+        {
+            TryPickSpot(false, lightRadius, baseLight);
+        }
+
+        for (int i = first; i < spots.Count; i++)
         {
             PlaceTree(spots[i]);
         }
@@ -131,30 +192,36 @@ public class TreeSpawner : MonoBehaviour
         stumps.Clear();
     }
 
-    private void PickSpots()
+    // One random spot inside (inLight) or outside the light circle, added to spots; false when none fit.
+    private bool TryPickSpot(bool inLight, float lightRadius, BaseLight baseLight)
     {
-        spots.Clear();
         Vector3 center = transform.position;
         float sqrSpacing = minSpacing * minSpacing;
 
-        for (int i = 0; i < treeCount; i++)
+        for (int attempt = 0; attempt < PlacementAttempts; attempt++)
         {
-            for (int attempt = 0; attempt < PlacementAttempts; attempt++)
+            Vector3 point;
+            if (inLight)
             {
-                Vector2 offset = Random.insideUnitCircle * areaRadius;
-                if (offset.magnitude < clearRadius)
+                Vector2 offset = Random.insideUnitCircle * lightRadius;
+                point = baseLight.Center + new Vector3(offset.x, 0f, offset.y);
+            }
+            else
+            {
+                point = center + new Vector3(Random.Range(-areaHalfSize, areaHalfSize), 0f, Random.Range(-areaHalfSize, areaHalfSize));
+                if (baseLight != null && baseLight.FlatDistance(point) <= lightRadius)
                 {
                     continue;
                 }
+            }
 
-                Vector3 point = center + new Vector3(offset.x, 0f, offset.y);
-                if (IsFarFromSpots(point, sqrSpacing) && BuildGrid.IsOpenGroundAt(point, layoutClearance))
-                {
-                    spots.Add(point);
-                    break;
-                }
+            if (IsFarFromSpots(point, sqrSpacing) && BuildGrid.IsOpenGroundAt(point, layoutClearance))
+            {
+                spots.Add(point);
+                return true;
             }
         }
+        return false;
     }
 
     private bool IsFarFromSpots(Vector3 point, float sqrSpacing)

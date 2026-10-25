@@ -15,8 +15,10 @@
  *   closer to the target opens up, and the normal spot must be clear by an extra 0.25 units before
  *   the weapon returns to it.
  * - If a WeaponLoadout is on a parent (the player), targets and the wanted ring spot come from it so
- *   several weapons split enemies and keep their distance; otherwise the weapon works alone.
- * - With no enemy in range the weapon stays on the ring and faces outward without attacking.
+ *   several weapons split enemies and keep their distance; otherwise the weapon works alone and picks its
+ *   target with FindOwnTarget (nearest in range; TurretGun overrides it). With ringRadius 0 it sits on its owner.
+ * - With no enemy in range the weapon stays on the ring and faces IdleFacing() (outward by default; turrets
+ *   scan) without attacking.
  * - Fire(target) is called only when the weapon faces the target within fireAngleTolerance and the
  *   cooldown is ready; the first attack happens immediately once aimed.
  * - Ring radius, turn speed, clearance and tolerance come from the AimedWeaponStats asset.
@@ -42,9 +44,13 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
     public Vector3 SlotDirection => slotDirection;
 
     // The target the shared targeting currently gives this weapon (same source Tick uses).
-    protected Damageable CurrentTarget => loadout != null
-        ? loadout.GetTarget(this)
-        : Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets);
+    protected Damageable CurrentTarget => loadout != null ? loadout.GetTarget(this) : FindOwnTarget();
+
+    // Target pick when there is no WeaponLoadout (e.g. turrets): nearest in range unless a subclass overrides it.
+    protected virtual Damageable FindOwnTarget()
+    {
+        return Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets);
+    }
     public float RingRadius => Stats.RingRadius;
     public float SeparationDistance => Stats.SeparationDistance;
 
@@ -92,10 +98,11 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
         }
         else
         {
-            target = Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets);
+            target = FindOwnTarget();
             hasWantedSlot = false;
 
-            if (target != null)
+            // With no ring (radius 0) the weapon sits on its owner, so slot spacing has nothing to do.
+            if (target != null && Stats.RingRadius > 0f)
             {
                 Vector3 fromOwner = Flat(target.transform.position - Owner.position);
                 if (fromOwner.sqrMagnitude > 0.0001f)
@@ -107,7 +114,7 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
         }
 
         float maxStep = Stats.TurnSpeed * Mathf.Deg2Rad * Time.deltaTime;
-        Vector3 desiredFacing = slotDirection;
+        Vector3 desiredFacing = target != null ? slotDirection : IdleFacing();
         bool hasTarget = false;
 
         if (hasWantedSlot)
@@ -151,6 +158,27 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
     }
 
     protected abstract void Fire(Damageable target);
+
+    // Where the weapon looks while it has no target (default: outward along its ring slot). Turrets scan here.
+    protected virtual Vector3 IdleFacing()
+    {
+        return slotDirection;
+    }
+
+    // Points the weapon (and its slot) at a flat direction at once, without turning.
+    protected void SnapFacing(Vector3 direction)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        facing = direction.normalized;
+        slotDirection = facing;
+        slotGoal = facing;
+        transform.rotation = Quaternion.LookRotation(facing);
+    }
 
     private void UpdateSlotGoal(Vector3 desired)
     {

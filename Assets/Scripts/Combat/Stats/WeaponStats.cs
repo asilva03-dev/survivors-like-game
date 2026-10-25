@@ -39,6 +39,21 @@ public abstract class WeaponStats : ScriptableObject
     }
     public TargetMask Targets => targets;
 
+    // Runtime changes, for upgrade copies only (turret upgrades call these on an Instantiate'd copy, never the asset).
+    public void AddDamage(float amount)
+    {
+        damage += amount;
+    }
+
+    // multiplier 1.25 = 25% more attacks per second.
+    public void ScaleFireRate(float multiplier)
+    {
+        if (multiplier > 0f)
+        {
+            attackInterval = Mathf.Max(0.01f, attackInterval / multiplier);
+        }
+    }
+
     public bool CanTarget(TargetCategory category)
     {
         return targets.Contains(category);

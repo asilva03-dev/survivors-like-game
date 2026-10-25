@@ -7,6 +7,7 @@
  *   the player has stopped using it for regenDelay seconds.
  * - All values are public tuning knobs in the inspector: maxStamina, regenRate
  *   (units per second) and regenDelay (seconds).
+ * - RegenMultiplier scales regenRate (set every frame by PlayerController: faster inside the base light).
  */
 
 using UnityEngine;
@@ -22,6 +23,7 @@ public class PlayerStamina : MonoBehaviour
     public float Current { get; private set; }
     public float Max => maxStamina;
     public float Normalized => maxStamina > 0f ? Current / maxStamina : 0f;
+    public float RegenMultiplier { get; set; } = 1f;
 
     private void Awake()
     {
@@ -36,7 +38,7 @@ public class PlayerStamina : MonoBehaviour
             return;
         }
 
-        Current = Mathf.Min(maxStamina, Current + regenRate * Time.deltaTime);
+        Current = Mathf.Min(maxStamina, Current + regenRate * RegenMultiplier * Time.deltaTime);
     }
 
     public bool TrySpend(float amount)

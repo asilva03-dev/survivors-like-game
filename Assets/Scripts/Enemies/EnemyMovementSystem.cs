@@ -1,6 +1,6 @@
 /*
  * EnemyMovementSystem
- * Moves every active enemy toward its target (Enemy.Target: the player or the base, whichever is closer) and
+ * Moves every active enemy toward its target (Enemy.Target: the player or the base, by the light rule) and
  * keeps them from overlapping, using separation steering instead of physics. One component handles all enemies.
  *
  * - Each frame: enemies are bucketed into a spatial grid so neighbor checks stay cheap, each enemy
@@ -25,8 +25,9 @@
  *   wallRadius, so enemies slide along walls and never cross them (knockback and crowd pushes included).
  * - An enemy buried deep inside a blocked area with no open side next to it (e.g. it spawned inside a chunk's blocked
  *   ground) is moved to the nearest walkable cell (within 12 cells) instead of staying stuck.
- * - forceBaseTarget (debug, temporary) makes every enemy target the base (Enemy.ForceBaseTarget) so the pathing can
- *   be tested on its own until the light-radius targeting exists.
+ * - Hunters (Enemy.IsHunter) never enter the BaseLight: after all moves they are kept hunterLightGap outside its
+ *   current radius (the edge works like a wall; a growing light pushes them out). A retreating hunter
+ *   (Enemy.HasMoveGoal) walks straight to its MoveGoal instead of its target.
  */
 
 using System.Collections.Generic;
@@ -40,10 +41,8 @@ public class EnemyMovementSystem : MonoBehaviour
     [SerializeField] private EnemySettings settings;
     [Tooltip("Enemy body radius used to keep enemies out of wall cells.")]
     [SerializeField, Min(0f)] private float wallRadius = 0.4f;
-
-    [Header("Debug")]
-    [Tooltip("Temporary: every enemy targets the base (tests the flow-field pathing on its own).")]
-    [SerializeField] private bool forceBaseTarget;
+    [Tooltip("Hunters stay this far outside the base light's edge (their body radius).")]
+    [SerializeField, Min(0f)] private float hunterLightGap = 0.5f;
 
     private readonly Dictionary<int, int> cellHead = new Dictionary<int, int>();
     private readonly List<int> neighbors = new List<int>(32);
@@ -77,7 +76,6 @@ public class EnemyMovementSystem : MonoBehaviour
 
     private void Update()
     {
-        Enemy.ForceBaseTarget = forceBaseTarget;
         List<Enemy> enemies = Enemy.Active;
         int count = enemies.Count;
         if (player == null || settings == null || count == 0)
@@ -92,7 +90,15 @@ public class EnemyMovementSystem : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            Damageable target = enemies[i].Target;
+            Enemy enemy = enemies[i];
+            Damageable target = enemy.Target;
+            if (enemy.HasMoveGoal)
+            {
+                goals[i] = new Vector2(enemy.MoveGoal.x, enemy.MoveGoal.z);
+                stops[i] = 0f;
+                followsField[i] = false;
+                continue;
+            }
             Vector3 goal = target != null ? target.transform.position : player.position;
             goals[i] = new Vector2(goal.x, goal.z);
             stops[i] = settings.StopDistance + (target != null ? target.TargetRadius : 0f);
@@ -108,17 +114,44 @@ public class EnemyMovementSystem : MonoBehaviour
         }
 
         BuildGrid walls = field != null ? field.Grid : global::BuildGrid.Instance;
+        BaseLight baseLight = BaseLight.Instance;
         for (int i = 0; i < count; i++)
         {
             if (walls != null)
             {
                 moved[i] = PushOutOfWalls(walls, positions[i], moved[i]);
             }
+            if (baseLight != null && enemies[i].IsHunter)
+            {
+                moved[i] = KeepOutOfLight(baseLight, positions[i], moved[i]);
+            }
 
             Transform t = enemies[i].transform;
             t.position = new Vector3(moved[i].x, t.position.y, moved[i].y);
             FaceTarget(enemies[i].Visual, moved[i], faces[i]);
         }
+    }
+
+    // Hunters never enter the base light: a centre inside Radius + hunterLightGap is put back on that circle.
+    private Vector2 KeepOutOfLight(BaseLight baseLight, Vector2 from, Vector2 to)
+    {
+        Vector3 c = baseLight.Center;
+        Vector2 center = new Vector2(c.x, c.z);
+        float limit = baseLight.Radius + hunterLightGap;
+        Vector2 offset = to - center;
+        if (offset.sqrMagnitude >= limit * limit)
+        {
+            return to;
+        }
+        if (offset.sqrMagnitude < 0.0001f)
+        {
+            offset = from - center;
+        }
+        if (offset.sqrMagnitude < 0.0001f)
+        {
+            offset = Vector2.up;
+        }
+        return center + offset.normalized * limit;
     }
 
     // Treats the enemy as a circle of wallRadius and pushes it out of every blocked cell it overlaps.
