@@ -6,7 +6,8 @@
  *
  * - A model = a floor quad showing the chunk's ChunkMinimap texture (painting colours plus the green/red door strips
  *   around the edge, unlit floorMaterial) + the chunk's walls as boxes, merged exactly like the real walls (WallBoxes,
- *   wallMaterial = WallBlock.mat, BaseLayout's wall height). Lit by the scene's own lights; no shadows.
+ *   wallMaterial = WallBlock.mat, BaseLayout's wall height). Lit by the scene's own lights, switched to daylight for the render by PreviewLighting
+ *   (slice 7); no shadows.
  * - ShowChunk() builds a card's model at rotation 0 and turns it to the card's rotation; Turn() animates the model a
  *   quarter turn over turnDuration (ease-out), re-rendering every frame while it turns, then it holds still.
  * - ShowLayout() builds the whole current base (every slot within the layout's reach) for the "Your base" card and
@@ -252,7 +253,9 @@ public class ChunkPreview : MonoBehaviour
             Quaternion.LookRotation(Vector3.down, Vector3.forward));
         previewCamera.farClipPlane = distance + 10f;
         previewCamera.targetTexture = stage.texture;
+        PreviewLighting.Begin();
         previewCamera.Render();
+        PreviewLighting.End();
         previewCamera.targetTexture = null;
     }
 

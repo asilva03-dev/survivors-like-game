@@ -10,7 +10,8 @@
  * - A temporary orthographic camera looks at its front three-quarter side (defenses face +Z when placed: from the
  *   north-east, ViewYaw, ViewAngle degrees down), framed tightly on its
  *   renderer bounds as seen from that angle, renders once into a RenderTexture with a transparent background, and the
- *   result is copied into a Texture2D. Everything temporary is destroyed afterwards. Lit by the scene lights.
+ *   result is copied into a Texture2D. Everything temporary is destroyed afterwards. Lit by the scene lights, switched
+ *   to daylight for the render by PreviewLighting (slice 7).
  */
 
 using System.Collections.Generic;
@@ -124,7 +125,9 @@ public static class DefensePreview
 
         RenderTexture target = RenderTexture.GetTemporary(size, size, 24, RenderTextureFormat.ARGB32);
         camera.targetTexture = target;
+        PreviewLighting.Begin();
         camera.Render();
+        PreviewLighting.End();
 
         RenderTexture previous = RenderTexture.active;
         RenderTexture.active = target;
