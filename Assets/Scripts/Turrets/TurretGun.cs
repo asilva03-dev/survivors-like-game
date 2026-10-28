@@ -66,7 +66,7 @@ public class TurretGun : GunWeapon
     {
         FlowField field = FlowField.Instance;
         BuildGrid grid = field != null ? field.Grid : null;
-        Vector3 basePoint = BaseLight.Instance != null ? BaseLight.Instance.Center : Owner.position;
+        Vector3 basePoint = BaseLight.Instance != null ? BaseLight.Instance.BasePosition : Owner.position;
         Vector3 from = Owner.position;
         float sqrRange = Range * Range;
 

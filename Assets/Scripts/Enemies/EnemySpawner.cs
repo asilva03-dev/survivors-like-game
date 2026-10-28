@@ -15,7 +15,7 @@
  * - Base share: a basic rat assigned to the base, spawned off-screen in a ring just outside the light
  *   (light TargetRadius + baseSpawnGap + up to baseSpawnBand, stepping outward when a try is visible).
  * - Every spot must also be open ground outside the base layout (BuildGrid.IsOpenGroundAt within groundClearance)
- *   and on the map (mapHalfSize around the light's centre). If no try passes, the last spot is used (the movement
+ *   and on the map (mapHalfSize around the base, BaseLight.BasePosition; the light's centre can sit off the base). If no try passes, the last spot is used (the movement
  *   system frees an enemy that lands in a wall).
  * - Recycling: player-assigned enemies farther than recycleDistance from the player are teleported to a fresh
  *   player-share spot (biased within aheadAngle of the player's movement). Base-bound enemies are never recycled
@@ -307,7 +307,7 @@ public class EnemySpawner : MonoBehaviour
         BaseLight baseLight = BaseLight.Instance;
         if (baseLight != null)
         {
-            Vector3 offset = point - baseLight.Center;
+            Vector3 offset = point - baseLight.BasePosition;
             if (Mathf.Abs(offset.x) > mapHalfSize || Mathf.Abs(offset.z) > mapHalfSize)
             {
                 return false;

@@ -25,7 +25,9 @@
  *     airborne, so the numbers hold; also used when walking off a wall), and falls with fallGravityMultiplier times
  *     that gravity so it doesn't float down. It clears the 1.5-tall base walls and the
  *     player can land and walk on wall tops (grounded = a short sphere cast down hits groundMask). A frictionless
- *     material on the capsule lets it slide up wall faces instead of sticking.
+ *     material on the capsule lets it slide up wall faces instead of sticking. While a jump is still rising (faster than
+ *     MaxGroundedRiseSpeed) it never counts as grounded; other rising (walking/dashing/sliding up a map ramp, slice 8)
+ *     does, so ramps keep dash, jump and slides working.
  *   - Dash jump: jumping during a dash keeps the dash speed until landing (a long leap, no extra cost). Air control:
  *     while in the light the leap turns toward the movement input at dashJumpTurnSpeed deg/s (speed unchanged).
  *     Plain jumps already steer like walking.
@@ -100,6 +102,7 @@ public class PlayerController : MonoBehaviour
     private CapsuleCollider capsule;
     private readonly RaycastHit[] groundHits = new RaycastHit[8];
     private bool jumpRequested;
+    private bool jumpRising;
     private bool dashJump;
     private float jumpGrace;
     private bool landedThisStep;
@@ -402,8 +405,13 @@ public class PlayerController : MonoBehaviour
     {
         bool wasGrounded = IsGrounded;
         jumpGrace -= Time.fixedDeltaTime;
-        // Rising never counts as grounded (passing a wall's top edge on the way up must not cut the jump's gravity).
-        IsGrounded = jumpGrace <= 0f && body.linearVelocity.y <= MaxGroundedRiseSpeed && CheckGround();
+        // A rising jump never counts as grounded (passing a wall's top edge on the way up must not cut the jump's
+        // gravity). Only the jump's own rise: walking, dashing or sliding up a ramp also rises and stays grounded.
+        if (jumpRising && body.linearVelocity.y <= MaxGroundedRiseSpeed)
+        {
+            jumpRising = false;
+        }
+        IsGrounded = jumpGrace <= 0f && !jumpRising && CheckGround();
         if (IsGrounded && !wasGrounded)
         {
             landedThisStep = true;
@@ -418,6 +426,7 @@ public class PlayerController : MonoBehaviour
             jumpRequested = false;
             velocity.y = JumpSpeed;
             IsGrounded = false;
+            jumpRising = true;
             jumpGrace = JumpGraceTime;
         }
         else if (!IsGrounded)

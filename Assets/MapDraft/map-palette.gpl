@@ -1,0 +1,18 @@
+GIMP Palette
+Name: Map Draft
+Columns: 5
+#
+ 40  40  40	Height L0 floor
+ 80  80  80	Height L1 +4
+120 120 120	Height L2 +8
+160 160 160	Height L3 +12
+200 200 200	Height L4 +16
+255   0   0	Ramp rises north
+255 255   0	Ramp rises east
+  0 120 255	Ramp rises south
+255   0 255	Ramp rises west
+  0 255 255	Marker base spawn centre
+255 128   0	Marker POI
+200 160  96	Marker path
+  0  90   0	Marker dense forest
+160 230 160	Marker clearing
