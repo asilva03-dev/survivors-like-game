@@ -10,7 +10,10 @@
  * - minPlateauSize: the smallest flat square (world units) the checker lists as big enough for a base spawn (base +
  *   light + its enemy spawn ring, ~150 today).
  * - Palette: levelColours[i] = level i (0 = the floor); one colour per ramp direction (the side it rises toward; north
- *   = up in the image). Must match Assets/MapDraft/map-palette.gpl.
+ *   = up in the image); baseRingColour = the 1 px outline of the base area (cyan). Must match
+ *   Assets/MapDraft/map-palette.gpl.
+ * - baseAreaSize: the outer size (world units) the base ring should have (170 = light + spawn ring + forest, a working
+ *   value); the checker warns when the painted ring is another size.
  * - Greybox (step 2, Editor/MapGreyboxBuilder): mapCenter = world position of the image's centre (the floor sits at
  *   its y); edgeSkirt = how far the walls along the map border reach below the floor; edgeWallHeight = height of the
  *   invisible walls that keep everyone on the map.
@@ -29,6 +32,8 @@ public class MapDraftSettings : ScriptableObject
     [SerializeField, Min(0.25f)] private float levelHeight = 4f;
     [Tooltip("Smallest flat square (world units) listed as big enough for a base spawn plateau.")]
     [SerializeField, Min(1f)] private float minPlateauSize = 150f;
+    [Tooltip("Outer size (world units) the base area ring should have, ring included.")]
+    [SerializeField, Min(1f)] private float baseAreaSize = 170f;
 
     [Header("Palette (exact colours)")]
     [Tooltip("Level 0 (the floor) first, then each level up.")]
@@ -44,6 +49,8 @@ public class MapDraftSettings : ScriptableObject
     [SerializeField] private Color32 rampEast = new Color32(255, 255, 0, 255);
     [SerializeField] private Color32 rampSouth = new Color32(0, 120, 255, 255);
     [SerializeField] private Color32 rampWest = new Color32(255, 0, 255, 255);
+    [Tooltip("The 1 px outline around the base area; its pixels take the level inside the ring.")]
+    [SerializeField] private Color32 baseRingColour = new Color32(0, 255, 255, 255);
 
     [Header("Greybox")]
     [Tooltip("World position of the image's centre; the floor (level 0) is at this y.")]
@@ -61,6 +68,8 @@ public class MapDraftSettings : ScriptableObject
     public float UnitsPerPixel => unitsPerPixel;
     public float LevelHeight => levelHeight;
     public float MinPlateauSize => minPlateauSize;
+    public float BaseAreaSize => baseAreaSize;
+    public Color32 BaseRingColour => baseRingColour;
     public int LevelCount => levelColours != null ? levelColours.Length : 0;
 
     public Color32 LevelColour(int level) => levelColours[level];

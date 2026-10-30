@@ -1,8 +1,8 @@
 /*
  * MapDraft
  * The painted height image read into data (slice 8): what every pixel is (a level, a ramp, or an unknown colour), the
- * connected areas, and what each ramp joins. Used by the checker (Editor/MapDraftSettingsEditor) and, later, by the
- * greybox builder.
+ * connected areas, and what each ramp joins. Used by the checker (Editor/MapDraftSettingsEditor) and the greybox
+ * builder (Editor/MapGreyboxBuilder).
  *
  * - Grid coordinates are texture coordinates: x to the east, y to the north, (0, 0) = the image's bottom-left pixel
  *   (so y maps straight to world +Z). Aseprite shows y from the top: AsepriteY(y) converts for messages.
@@ -13,6 +13,10 @@
  *   its high end the one just past it on the side it rises toward; LowEnd / HighEnd hold the level regions found
  *   there, LowEndOther / HighEndOther count end pixels that are not a level (map edge, another ramp, unknown).
  * - Links(): which level regions each ramp joins (both ways), for reachability checks.
+ * - Base ring (2026-10-29): pixels in the settings' baseRingColour (cyan) outline the base area. BaseRing describes
+ *   them (bounds, how many separate pieces, whether the outline is closed, what is inside); ring pixels take the most
+ *   common level inside the ring, so everything else (regions, ramps, the greybox) treats the ring as that level.
+ *   If nothing inside is a level, ring pixels stay "not a level" (the checker reports it). Null when there is no cyan.
  */
 
 using System.Collections.Generic;
@@ -49,6 +53,23 @@ public class MapDraft
         public int HighEndOther;
     }
 
+    public class BaseRingInfo
+    {
+        public int PixelCount;
+        public int Pieces;
+        public RectInt Bounds;
+        public int BorderPixels;
+        public int ExpectedBorderPixels;
+        public int InsideLevel = NotLevel;
+        public int InsideLevelKinds;
+        public int InsideNotLevel;
+        public bool Closed => BorderPixels == ExpectedBorderPixels && PixelCount == BorderPixels;
+        /// <summary>The ring's centre in grid corner units (x east, y north); a whole pixel's centre when the size is odd.</summary>
+        public Vector2 Center => new Vector2(Bounds.xMin + Bounds.width * 0.5f, Bounds.yMin + Bounds.height * 0.5f);
+    }
+
+    public BaseRingInfo BaseRing { get; private set; }
+
     public int Width { get; private set; }
     public int Height { get; private set; }
     public int[] Level { get; private set; }
@@ -72,6 +93,7 @@ public class MapDraft
         draft.Level = new int[count];
         draft.RampDirection = new int[count];
         draft.RegionOf = new int[count];
+        bool[] ring = new bool[count];
 
         for (int i = 0; i < count; i++)
         {
@@ -100,9 +122,13 @@ public class MapDraft
                         }
                     }
                 }
+                if (draft.Level[i] == NotLevel && draft.RampDirection[i] == NotRamp && Same(c, settings.BaseRingColour))
+                {
+                    ring[i] = true;
+                }
             }
 
-            if (draft.Level[i] == NotLevel && draft.RampDirection[i] == NotRamp)
+            if (draft.Level[i] == NotLevel && draft.RampDirection[i] == NotRamp && !ring[i])
             {
                 draft.UnknownCount++;
                 string key = c.a == 255
@@ -121,10 +147,119 @@ public class MapDraft
             }
         }
 
+        draft.ReadBaseRing(ring, settings.LevelCount);
         draft.FindRegions();
         draft.FindSquares();
         draft.FindRamps();
         return draft;
+    }
+
+    // Describes the cyan ring and gives its pixels the most common level inside it.
+    private void ReadBaseRing(bool[] ring, int levelCount)
+    {
+        BaseRingInfo info = new BaseRingInfo();
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+        for (int i = 0; i < ring.Length; i++)
+        {
+            if (!ring[i])
+            {
+                continue;
+            }
+            info.PixelCount++;
+            int x = i % Width;
+            int y = i / Width;
+            minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x);
+            minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y);
+        }
+        if (info.PixelCount == 0)
+        {
+            BaseRing = null;
+            return;
+        }
+        info.Bounds = new RectInt(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        RectInt b = info.Bounds;
+        info.ExpectedBorderPixels = b.width >= 2 && b.height >= 2 ? 2 * b.width + 2 * b.height - 4 : b.width * b.height;
+
+        // Separate pieces (4-neighbour).
+        bool[] seen = new bool[ring.Length];
+        int[] stack = new int[ring.Length];
+        for (int start = 0; start < ring.Length; start++)
+        {
+            if (!ring[start] || seen[start])
+            {
+                continue;
+            }
+            info.Pieces++;
+            int top = 0;
+            stack[top++] = start;
+            seen[start] = true;
+            while (top > 0)
+            {
+                int index = stack[--top];
+                int x = index % Width;
+                int y = index / Width;
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0);
+                    int ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (InBounds(nx, ny) && ring[Index(nx, ny)] && !seen[Index(nx, ny)])
+                    {
+                        seen[Index(nx, ny)] = true;
+                        stack[top++] = Index(nx, ny);
+                    }
+                }
+            }
+        }
+
+        // Border vs inside.
+        int[] levelPixels = new int[levelCount];
+        for (int y = b.yMin; y < b.yMax; y++)
+        {
+            for (int x = b.xMin; x < b.xMax; x++)
+            {
+                int i = Index(x, y);
+                bool border = x == b.xMin || y == b.yMin || x == b.xMax - 1 || y == b.yMax - 1;
+                if (border)
+                {
+                    if (ring[i])
+                    {
+                        info.BorderPixels++;
+                    }
+                }
+                else if (Level[i] != NotLevel)
+                {
+                    levelPixels[Level[i]]++;
+                }
+                else
+                {
+                    info.InsideNotLevel++;
+                }
+            }
+        }
+        int best = 0;
+        for (int level = 0; level < levelCount; level++)
+        {
+            if (levelPixels[level] > 0)
+            {
+                info.InsideLevelKinds++;
+            }
+            if (levelPixels[level] > best)
+            {
+                best = levelPixels[level];
+                info.InsideLevel = level;
+            }
+        }
+        if (info.InsideLevel != NotLevel)
+        {
+            for (int i = 0; i < ring.Length; i++)
+            {
+                if (ring[i])
+                {
+                    Level[i] = info.InsideLevel;
+                }
+            }
+        }
+        BaseRing = info;
     }
 
     private static bool Same(Color32 a, Color32 b)

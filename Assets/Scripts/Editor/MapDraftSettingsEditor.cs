@@ -10,6 +10,10 @@
  *   wrong way (the low end is higher: says which colour it should be). Warnings: ramps that aren't rectangles, narrow
  *   ramps, levels no ramp connects to the floor. Info: size, levels, every ramp (levels, length, slope), and the flat
  *   areas big enough for a base spawn (minPlateauSize).
+ * - Base ring (2026-10-29): errors for more than one cyan piece, an outline that isn't a closed 1 px rectangle,
+ *   anything inside that isn't a level (ramps, other colours, more cyan), more than one level inside, or a ring
+ *   touching the map edge; a warning when there is no ring or its size isn't baseAreaSize; info: where it is, its
+ *   level and its centre (Aseprite pixel + world position).
  * - Reachability ignores walking direction and drops: a level counts as reachable when ramps join it to the floor.
  * - "Build greybox" (step 2) runs MapGreyboxBuilder.Build and shows its result in the same place.
  */
@@ -144,6 +148,66 @@ public class MapDraftSettingsEditor : Editor
                 result.Add(Error(string.Format("Colour {0} is not in the palette, e.g. at{1}.", pair.Key, at), ref errors));
             }
             result.Add(Error(draft.UnknownCount + " pixels in all have unknown colours.", ref errors));
+        }
+
+        // Base ring.
+        MapDraft.BaseRingInfo ring = draft.BaseRing;
+        if (ring == null)
+        {
+            result.Add(Warning("No base ring (cyan outline) found: paint one around the base area.", ref warnings));
+        }
+        else
+        {
+            RectInt rb = ring.Bounds;
+            string ringWhere = Where(draft, rb);
+            if (ring.Pieces > 1)
+            {
+                result.Add(Error("The cyan is in " + ring.Pieces + " separate pieces (box around all of it: " + ringWhere + "); paint exactly one closed ring.", ref errors));
+            }
+            if (rb.width < 3 || rb.height < 3)
+            {
+                result.Add(Error("The base ring " + ringWhere + " is too small to have an inside.", ref errors));
+            }
+            else if (!ring.Closed)
+            {
+                result.Add(Error(string.Format("The base ring {0} isn't a closed 1 px outline: {1} of its {2} edge pixels are cyan, {3} cyan pixel(s) are inside it.",
+                    ringWhere, ring.BorderPixels, ring.ExpectedBorderPixels, ring.PixelCount - ring.BorderPixels), ref errors));
+            }
+            if (ring.InsideNotLevel > 0)
+            {
+                result.Add(Error("Inside the base ring " + ringWhere + ", " + ring.InsideNotLevel + " pixel(s) aren't a level (ramps, cyan or other colours); the inside must be one flat level.", ref errors));
+            }
+            if (ring.InsideLevel == MapDraft.NotLevel)
+            {
+                result.Add(Error("The base ring " + ringWhere + " has no level inside it, so its height is unknown.", ref errors));
+            }
+            else if (ring.InsideLevelKinds > 1)
+            {
+                result.Add(Error("Inside the base ring " + ringWhere + " there are " + ring.InsideLevelKinds + " different levels; it must be one flat level.", ref errors));
+            }
+            if (rb.xMin == 0 || rb.yMin == 0 || rb.xMax == draft.Width || rb.yMax == draft.Height)
+            {
+                result.Add(Error("The base ring " + ringWhere + " touches the map edge.", ref errors));
+            }
+            int wantPx = Mathf.RoundToInt(settings.BaseAreaSize / unit);
+            if (rb.width != wantPx || rb.height != wantPx)
+            {
+                result.Add(Warning(string.Format("The base ring is {0} x {1} px ({2} x {3} units); Base Area Size {4} units = {5} x {5} px at {6} units per pixel.",
+                    rb.width, rb.height, rb.width * unit, rb.height * unit, settings.BaseAreaSize, wantPx, unit), ref warnings));
+            }
+            Vector3 world = settings.MapCenter + new Vector3((ring.Center.x - draft.Width * 0.5f) * unit, 0f, (ring.Center.y - draft.Height * 0.5f) * unit);
+            if (ring.InsideLevel != MapDraft.NotLevel)
+            {
+                world.y += ring.InsideLevel * settings.LevelHeight;
+            }
+            bool oddSize = rb.width % 2 == 1 && rb.height % 2 == 1;
+            string centre = oddSize
+                ? string.Format("pixel ({0}, {1})", rb.xMin + rb.width / 2, draft.AsepriteY(rb.yMin + rb.height / 2))
+                : string.Format("between pixels, around ({0:0.#}, {1:0.#})", ring.Center.x - 0.5f, draft.Height - ring.Center.y - 0.5f);
+            result.Add(Info(string.Format("Base ring {0}: {1} x {2} px ({3} x {4} units), level L{5}; base centre at {6} = world ({7:0.#}, {8:0.#}, {9:0.#}). Edge gaps (px): left {10}, right {11}, top {12}, bottom {13}.",
+                ringWhere, rb.width, rb.height, rb.width * unit, rb.height * unit,
+                ring.InsideLevel == MapDraft.NotLevel ? "?" : ring.InsideLevel.ToString(), centre, world.x, world.y, world.z,
+                rb.xMin, draft.Width - rb.xMax, draft.Height - rb.yMax, rb.yMin)));
         }
 
         // Levels.
