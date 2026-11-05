@@ -1,8 +1,11 @@
 /*
  * EnemySpawner
- * Pooled enemy spawner and (until the round state machine exists) the spawn director of TD slice 4: one continuous
- * spawn stream (spawnsPerSecond, cap maxEnemies) split between the base and the player.
+ * Pooled enemy spawner: where and as what each enemy appears. It no longer spawns on its own (round system step 2,
+ * 2026-11-05): RunDirector calls TrySpawn once per enemy at the current wave's rate. The old steady stream
+ * (spawnsPerSecond) and the alive cap (maxEnemies) were removed (the cap was a test aid, user).
  *
+ * - TrySpawn(rangedChance): one enemy, split between the base and the player as below; false (nothing spawned, counted
+ *   in SkippedSpawns) when no valid spot was found, spawning is paused, or there is no player.
  * - Enemies come from ComponentPools built from enemyPrefab (normal) and rangedEnemyPrefab (prewarmed), never
  *   Instantiate/Destroy at runtime. Dead enemies return to the pool they came from via Damageable.Died, and hunters
  *   that retreated off-screen via Enemy.DespawnRequested (no death).
@@ -10,7 +13,7 @@
  *   player is in the BaseLight; in the dark it rises from playerShareMin to playerShareMax over playerShareRampTime
  *   seconds and resets when the player returns to the light. No BaseLight = always the dark.
  * - Player share: spawned at an off-screen spot around the player (minSpawnDistance, stepping outward) that is also
- *   at least lightClearance outside the light; rangedChance of them are ranged rats (hunters), the rest basic rats
+ *   at least lightClearance outside the light; the wave's rangedChance of them are ranged rats (hunters), the rest basic rats
  *   assigned to the player (Enemy.Assignment). Ranged rats only ever come from this share. With a map (MapRoutes) the
  *   spot must also have a walking route to the player, so hills and slopes are fine but sealed-off ground is not.
  * - Base share (user's rule, 2026-10-30): a basic rat assigned to the base, at a random direction around the light,
@@ -24,8 +27,9 @@
  * - Recycling: player-assigned enemies farther than recycleDistance from the player are moved to a fresh
  *   player-share spot (biased within aheadAngle of the player's movement); if none is found they stay where they are.
  *   Base-bound enemies are never recycled (they are walking to the base) and retreating hunters despawn on their own.
- * - SpawnsEnabled pauses/resumes spawning (the timer resets, so no burst on resume) and raises
+ * - SpawnsEnabled pauses/resumes spawning (TrySpawn refuses while paused; the run clock keeps going) and raises
  *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
+ * - BaseAliveCount / PlayerAliveCount: alive enemies by assignment (debug line).
  * - The player is found by the "Player" tag; the camera is Camera.main.
  */
 
@@ -39,11 +43,9 @@ public class EnemySpawner : MonoBehaviour
 
     [SerializeField] private Enemy enemyPrefab;
     [SerializeField] private Enemy rangedEnemyPrefab;
-    [Tooltip("Share of the player's spawns that are ranged rats (hunters). Ranged rats never come from the base share.")]
-    [SerializeField, Range(0f, 1f)] private float rangedChance = 0.2f;
+    [Tooltip("Ranged rats made at load (the pool grows if more are needed, with a small hitch).")]
     [SerializeField, Min(0)] private int rangedPrewarmCount = 10;
-    [SerializeField, Min(0.1f)] private float spawnsPerSecond = 2f;
-    [SerializeField, Min(1)] private int maxEnemies = 30;
+    [Tooltip("Basic rats made at load (the pool grows if more are needed, with a small hitch).")]
     [SerializeField, Min(1)] private int prewarmCount = 30;
 
     [Header("Split")]
@@ -81,7 +83,6 @@ public class EnemySpawner : MonoBehaviour
     private Transform player;
     private Rigidbody playerBody;
     private Camera cam;
-    private float spawnTimer;
     private float darkTime;
     private bool spawnsEnabled = true;
 
@@ -91,6 +92,26 @@ public class EnemySpawner : MonoBehaviour
     public float PlayerShare { get; private set; }
     public float DarkTime => darkTime;
     public int AliveCount => alive.Count;
+
+    /// <summary>Alive enemies walking to the base.</summary>
+    public int BaseAliveCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (Enemy enemy in alive.Keys)
+            {
+                if (enemy.Assignment == EnemyAssignment.Base)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+
+    /// <summary>Alive enemies coming for the player (hunters included).</summary>
+    public int PlayerAliveCount => alive.Count - BaseAliveCount;
 
     public bool SpawnsEnabled
     {
@@ -103,7 +124,6 @@ public class EnemySpawner : MonoBehaviour
             }
 
             spawnsEnabled = value;
-            spawnTimer = 0f;
             SpawnsEnabledChanged?.Invoke(value);
         }
     }
@@ -155,29 +175,6 @@ public class EnemySpawner : MonoBehaviour
         }
 
         UpdateShare();
-        float interval = 1f / spawnsPerSecond;
-
-        if (!spawnsEnabled)
-        {
-            RecycleFarEnemies();
-            return;
-        }
-
-        spawnTimer += Time.deltaTime;
-
-        if (alive.Count >= maxEnemies)
-        {
-            spawnTimer = Mathf.Min(spawnTimer, interval);
-        }
-        else
-        {
-            while (spawnTimer >= interval && alive.Count < maxEnemies)
-            {
-                spawnTimer -= interval;
-                Spawn();
-            }
-        }
-
         RecycleFarEnemies();
     }
 
@@ -194,8 +191,18 @@ public class EnemySpawner : MonoBehaviour
     /// <summary>Spawns that found no valid spot and were skipped (for testing).</summary>
     public int SkippedSpawns { get; private set; }
 
-    private void Spawn()
+    /// <summary>Spawns one enemy (base or player share, see the header). False when nothing spawned.</summary>
+    public bool TrySpawn(float rangedChance)
     {
+        if (!spawnsEnabled || player == null)
+        {
+            return false;
+        }
+        if (cam == null)
+        {
+            cam = Camera.main;
+        }
+
         Vector3 point;
         if (Random.value < PlayerShare)
         {
@@ -204,22 +211,23 @@ public class EnemySpawner : MonoBehaviour
             if (!TryFindPlayerSpawnPoint(false, out point))
             {
                 SkippedSpawns++;
-                return;
+                return false;
             }
             Enemy hunter = source.Get(point, Quaternion.identity);
             hunter.Assignment = EnemyAssignment.Player;
             alive.Add(hunter, source);
-            return;
+            return true;
         }
 
         if (!TryFindBaseSpawnPoint(out point))
         {
             SkippedSpawns++;
-            return;
+            return false;
         }
         Enemy enemy = pool.Get(point, Quaternion.identity);
         enemy.Assignment = EnemyAssignment.Base;
         alive.Add(enemy, pool);
+        return true;
     }
 
     private void HandleDied(Damageable target)
