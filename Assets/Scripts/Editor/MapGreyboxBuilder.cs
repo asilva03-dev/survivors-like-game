@@ -13,6 +13,8 @@
  *   walls along sloped walkways are trapezoids); along the map border walls reach edgeSkirt below the floor.
  * - Collision: one combined mesh of every face on a MeshCollider on the root (no seams between pieces), plus four
  *   invisible box walls (Edges) just outside the border, edgeWallHeight tall. Layer Default, like the old Ground.
+ * - The root also gets a MapGround with the same pixel data baked in (heights + which edges are cliffs), for game code
+ *   that needs the ground without physics (2026-10-29), and a MapRoutes (enemy route maps around cliffs).
  * - Materials are created only when missing (grey shades per level, tan ramps, dark brown walls), so colours tuned by
  *   hand survive a rebuild. Meshes are rewritten in place (Clear + setters) so prefab references stay valid.
  */
@@ -228,6 +230,8 @@ public static class MapGreyboxBuilder
             GameObject root = new GameObject("MapGreybox");
             SceneManager.MoveGameObjectToScene(root, stage);
             root.AddComponent<MeshCollider>().sharedMesh = collisionMesh;
+            root.AddComponent<MapGround>().Bake(draft, settings, southWest);
+            root.AddComponent<MapRoutes>();
             for (int level = 0; level < levels.Length; level++)
             {
                 AddPiece(root, "Level" + level, levelMeshes[level], GetMaterial("Level" + level, LevelShades[Mathf.Min(level, LevelShades.Length - 1)]));

@@ -33,7 +33,8 @@
  *     Plain jumps already steer like walking.
  *   - Stamina regen x lightRegenMultiplier (PlayerStamina.RegenMultiplier).
  * - FeetHeight = how far the feet are above the world ground (y 0); OutOfBiteReach (feet above biteClearHeight, in the
- *   air or on a wall top) stops enemy contact damage (Enemy). Enemy bullets still hit.
+ *   air or on a wall top) stops enemy contact damage (Enemy). Enemy bullets still hit. OutOfBiteReachFrom(enemy feet)
+ *   (2026-10-29, used by Enemy) measures the same against an enemy's feet instead of y 0, so hills and cliffs count.
  */
 
 using UnityEngine;
@@ -129,6 +130,8 @@ public class PlayerController : MonoBehaviour
     public float JumpSpeed => 4f * jumpHeight / jumpAirTime;
     public float FeetHeight => transform.position.y - HalfHeight;
     public bool OutOfBiteReach => FeetHeight > biteClearHeight;
+    /// <summary>Out of bite reach of an enemy whose feet are at world y `enemyFeet`: more than biteClearHeight above or below them.</summary>
+    public bool OutOfBiteReachFrom(float enemyFeet) => Mathf.Abs(FeetHeight - enemyFeet) > biteClearHeight;
 
     private float JumpGravity => 8f * jumpHeight / (jumpAirTime * jumpAirTime);
     private float HalfHeight => capsule != null ? capsule.height * 0.5f * transform.lossyScale.y : 1f;

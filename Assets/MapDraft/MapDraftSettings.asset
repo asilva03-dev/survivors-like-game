@@ -43,6 +43,6 @@ MonoBehaviour:
   baseRingColour:
     serializedVersion: 2
     rgba: 4294967040
-  mapCenter: {x: 0, y: 0, z: 0}
+  mapCenter: {x: -19, y: 0, z: 1}
   edgeSkirt: 2
   edgeWallHeight: 40

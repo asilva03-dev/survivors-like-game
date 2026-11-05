@@ -27,8 +27,9 @@
  *     (released AggroRelease units further out, so it doesn't flicker).
  *   - No base: the player; no player: the closest base.
  * - Contact damage: an enemy within its stats' contactRange of its target's edge hurts it, at most once per
- *   contactInterval (see EnemyStats), except a player whose feet are out of bite reach (jumping or on a wall top,
- *   PlayerController.OutOfBiteReach). Subclasses that override Update must call base.Update().
+ *   contactInterval (see EnemyStats), except a player whose feet are out of bite reach of this enemy's feet (jumping,
+ *   on a wall top, or above/below it across a cliff: PlayerController.OutOfBiteReachFrom, measured from FeetY = the
+ *   root minus rootAboveFeet, 1 on the rat prefabs). Subclasses that override Update must call base.Update().
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -59,6 +60,8 @@ public class Enemy : Damageable
 
     [SerializeField] private Transform visual;
     [SerializeField] private EnemyStats stats;
+    [Tooltip("How far the root sits above the model's feet (the rat prefabs: 1). Used to stand enemies on the map ground and for bite reach.")]
+    [SerializeField] private float rootAboveFeet = 1f;
 
     private Vector2 knockDirection;
     private float knockDistance;
@@ -71,6 +74,11 @@ public class Enemy : Damageable
 
     // What this enemy is going for: the player or a base (light rule, refreshed every frame).
     public Damageable Target { get; private set; }
+    // Downward speed while falling off a ledge (EnemyMovementSystem; 0 on the ground). Reset on enable.
+    public float FallSpeed { get; set; }
+    public float RootAboveFeet => rootAboveFeet;
+    /// <summary>World y of the enemy's feet (root minus rootAboveFeet).</summary>
+    public float FeetY => transform.position.y - rootAboveFeet;
     public EnemyAssignment Assignment { get; set; }
     public bool IsHunter => stats != null && stats.IsHunter;
     // Set while a hunter retreats: EnemyMovementSystem walks it to MoveGoal instead of its target.
@@ -96,6 +104,7 @@ public class Enemy : Damageable
         base.OnEnable();
         Active.Add(this);
         knockRemaining = 0f;
+        FallSpeed = 0f;
         contactCooldown = 0f;
         aggroed = false;
         hunterState = HunterState.Hunt;
@@ -252,8 +261,10 @@ public class Enemy : Damageable
             return;
         }
 
-        // A player in the air or standing on a wall top is out of bite reach (PlayerController.OutOfBiteReach).
-        if (Target is PlayerHealth && PlayerController.Instance != null && PlayerController.Instance.OutOfBiteReach)
+        // A player whose feet are well above or below this enemy's feet (its root) is out of bite reach: jumping, on a
+        // wall top, or across a cliff (PlayerController.OutOfBiteReachFrom).
+        if (Target is PlayerHealth && PlayerController.Instance != null
+            && PlayerController.Instance.OutOfBiteReachFrom(FeetY))
         {
             return;
         }

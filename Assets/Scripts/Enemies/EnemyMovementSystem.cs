@@ -28,6 +28,15 @@
  * - Hunters (Enemy.IsHunter) never enter the BaseLight: after all moves they are kept hunterLightGap outside its
  *   current radius (the edge works like a wall; a growing light pushes them out). A retreating hunter
  *   (Enemy.HasMoveGoal) walks straight to its MoveGoal instead of its target.
+ * - Map ground (map slice step 4, 2026-10-29; only when a MapGround exists): after the moves above, an enemy is pushed
+ *   out of every map pixel around it that it can't walk into from the pixel it stands on (higher ground across a cliff,
+ *   the map edge) as a circle of wallRadius, so it slides along cliffs. Lower ground (MapGround.CanDrop) is open: it
+ *   walks off the ledge and falls (fallGravity) until it lands; walking up or down ramps follows the ground at once.
+ *   Diagonal neighbours count as open when either straight route is. The enemy's feet (root minus
+ *   Enemy.RootAboveFeet) are put on the ground.
+ * - Map routes (step 5, only with a MapRoutes): an enemy going for the player, or for the base where the base grid's
+ *   flow field gives no direction, walks straight while the straight line to its target crosses no cliff; otherwise it
+ *   follows MapRoutes toward the next map pixel (around cliffs, up ramps). Retreating hunters still walk straight.
  */
 
 using System.Collections.Generic;
@@ -43,6 +52,8 @@ public class EnemyMovementSystem : MonoBehaviour
     [SerializeField, Min(0f)] private float wallRadius = 0.4f;
     [Tooltip("Hunters stay this far outside the base light's edge (their body radius).")]
     [SerializeField, Min(0f)] private float hunterLightGap = 0.5f;
+    [Tooltip("Downward acceleration of an enemy that walked off a ledge (units/s²).")]
+    [SerializeField, Min(0f)] private float fallGravity = 30f;
 
     private readonly Dictionary<int, int> cellHead = new Dictionary<int, int>();
     private readonly List<int> neighbors = new List<int>(32);
@@ -51,6 +62,8 @@ public class EnemyMovementSystem : MonoBehaviour
     private Vector2[] goals = new Vector2[64];
     private float[] stops = new float[64];
     private bool[] followsField = new bool[64];
+    // 0 = no map route, 1 = route to the player, 2 = route to the base (MapRoutes).
+    private byte[] routeTo = new byte[64];
     private Vector2[] faces = new Vector2[64];
     private int[] nextInCell = new int[64];
 
@@ -97,12 +110,14 @@ public class EnemyMovementSystem : MonoBehaviour
                 goals[i] = new Vector2(enemy.MoveGoal.x, enemy.MoveGoal.z);
                 stops[i] = 0f;
                 followsField[i] = false;
+                routeTo[i] = 0;
                 continue;
             }
             Vector3 goal = target != null ? target.transform.position : player.position;
             goals[i] = new Vector2(goal.x, goal.z);
             stops[i] = settings.StopDistance + (target != null ? target.TargetRadius : 0f);
             followsField[i] = field != null && target is BaseStructure;
+            routeTo[i] = (byte)(target is BaseStructure ? 2 : 1);
         }
 
         BucketEnemies(enemies, count, cellSize);
@@ -115,6 +130,11 @@ public class EnemyMovementSystem : MonoBehaviour
 
         BuildGrid walls = field != null ? field.Grid : global::BuildGrid.Instance;
         BaseLight baseLight = BaseLight.Instance;
+        MapGround ground = MapGround.Instance;
+        if (ground != null && !ground.HasData)
+        {
+            ground = null;
+        }
         for (int i = 0; i < count; i++)
         {
             if (walls != null)
@@ -127,9 +147,117 @@ public class EnemyMovementSystem : MonoBehaviour
             }
 
             Transform t = enemies[i].transform;
-            t.position = new Vector3(moved[i].x, t.position.y, moved[i].y);
+            float y = t.position.y;
+            if (ground != null)
+            {
+                moved[i] = KeepOffCliffs(ground, positions[i], moved[i]);
+                y = GroundHeight(ground, enemies[i], moved[i], y);
+            }
+            t.position = new Vector3(moved[i].x, y, moved[i].y);
             FaceTarget(enemies[i].Visual, moved[i], faces[i]);
         }
+    }
+
+    // Root height with the feet on the ground (Enemy.RootAboveFeet): up/down ramps at once, off a ledge as a fall
+    // (Enemy.FallSpeed) until landing.
+    private float GroundHeight(MapGround ground, Enemy enemy, Vector2 position, float y)
+    {
+        float floor = ground.HeightAt(new Vector3(position.x, 0f, position.y)) + enemy.RootAboveFeet;
+        if (y <= floor + 0.01f || Time.deltaTime <= 0f)
+        {
+            enemy.FallSpeed = 0f;
+            return floor;
+        }
+        // Only a real drop falls; a small step down (walking down a ramp) follows the ground.
+        if (enemy.FallSpeed <= 0f && y - floor < 0.5f)
+        {
+            return floor;
+        }
+        enemy.FallSpeed += fallGravity * Time.deltaTime;
+        return Mathf.Max(floor, y - enemy.FallSpeed * Time.deltaTime);
+    }
+
+    // Pushes the enemy (a circle of wallRadius) out of every neighbouring map pixel it can't walk into from the pixel
+    // it stood on (`from`): higher ground across a cliff or off the map. Lower ground (a drop) and same-height edges are open.
+    private Vector2 KeepOffCliffs(MapGround ground, Vector2 from, Vector2 position)
+    {
+        Vector2Int standing = ground.WorldToPixel(new Vector3(from.x, 0f, from.y));
+        if (!ground.InBounds(standing))
+        {
+            return position;
+        }
+        float unit = ground.UnitsPerPixel;
+        Vector3 southWest = ground.SouthWest;
+        for (int iteration = 0; iteration < 2; iteration++)
+        {
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+                    Vector2Int pixel = new Vector2Int(standing.x + dx, standing.y + dy);
+                    if (!BlocksFrom(ground, standing, pixel))
+                    {
+                        continue;
+                    }
+                    Vector2 min = new Vector2(southWest.x + pixel.x * unit, southWest.z + pixel.y * unit);
+                    position = PushOutOfRect(from, position, min, min + new Vector2(unit, unit));
+                }
+            }
+        }
+        return position;
+    }
+
+    private static bool Passable(MapGround ground, Vector2Int from, Vector2Int to)
+    {
+        return ground.CanStep(from, to) || ground.CanDrop(from, to);
+    }
+
+    // Whether `pixel` (one of the 8 around `standing`) can't be entered from `standing`.
+    private static bool BlocksFrom(MapGround ground, Vector2Int standing, Vector2Int pixel)
+    {
+        if (!ground.InBounds(pixel))
+        {
+            return true;
+        }
+        int dx = pixel.x - standing.x;
+        int dy = pixel.y - standing.y;
+        if (dx == 0 || dy == 0)
+        {
+            return !Passable(ground, standing, pixel);
+        }
+        Vector2Int sideX = new Vector2Int(standing.x + dx, standing.y);
+        Vector2Int sideY = new Vector2Int(standing.x, standing.y + dy);
+        bool viaX = Passable(ground, standing, sideX) && Passable(ground, sideX, pixel);
+        bool viaY = Passable(ground, standing, sideY) && Passable(ground, sideY, pixel);
+        return !viaX && !viaY;
+    }
+
+    // Circle of wallRadius out of a rectangle; a centre inside leaves on the side `from` is on (the shallower if two).
+    private Vector2 PushOutOfRect(Vector2 from, Vector2 position, Vector2 min, Vector2 max)
+    {
+        Vector2 closest = new Vector2(Mathf.Clamp(position.x, min.x, max.x), Mathf.Clamp(position.y, min.y, max.y));
+        Vector2 offset = position - closest;
+        float sqr = offset.sqrMagnitude;
+        if (sqr > 0.000001f)
+        {
+            if (sqr >= wallRadius * wallRadius)
+            {
+                return position;
+            }
+            return closest + offset / Mathf.Sqrt(sqr) * wallRadius;
+        }
+
+        float best = float.MaxValue;
+        Vector2 result = position;
+        if (from.x < min.x && position.x - min.x < best) { best = position.x - min.x; result = new Vector2(min.x - wallRadius, position.y); }
+        if (from.x > max.x && max.x - position.x < best) { best = max.x - position.x; result = new Vector2(max.x + wallRadius, position.y); }
+        if (from.y < min.y && position.y - min.y < best) { best = position.y - min.y; result = new Vector2(position.x, min.y - wallRadius); }
+        if (from.y > max.y && max.y - position.y < best) { best = max.y - position.y; result = new Vector2(position.x, max.y + wallRadius); }
+        return best < float.MaxValue ? result : from;
     }
 
     // Hunters never enter the base light: a centre inside Radius + hunterLightGap is put back on that circle.
@@ -323,6 +451,7 @@ public class EnemyMovementSystem : MonoBehaviour
     private void ComputeMoves(int count, float cellSize, FlowField field)
     {
         float dt = Time.deltaTime;
+        MapRoutes routes = MapRoutes.Instance;
         float radius = settings.SeparationRadius;
         float sqrRadius = radius * radius;
 
@@ -339,6 +468,7 @@ public class EnemyMovementSystem : MonoBehaviour
                 float moveSpeed = enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed;
                 float speed = Mathf.Min(moveSpeed, (distance - stops[i]) / dt);
                 Vector2 direction = toTarget / distance;
+                bool routed = false;
 
                 if (followsField[i])
                 {
@@ -347,7 +477,18 @@ public class EnemyMovementSystem : MonoBehaviour
                     {
                         direction = new Vector2(flow.x, flow.z);
                         faces[i] = positions[i] + direction;
+                        routed = true;
                     }
+                }
+
+                // Outside the base grid's flow field: map route around cliffs (straight when the line is clear).
+                Vector3 routeDirection;
+                if (!routed && routes != null && routeTo[i] != 0
+                    && routes.TryGetDirection(new Vector3(positions[i].x, 0f, positions[i].y),
+                        new Vector3(goals[i].x, 0f, goals[i].y), routeTo[i] == 1, out routeDirection))
+                {
+                    direction = new Vector2(routeDirection.x, routeDirection.z);
+                    faces[i] = positions[i] + direction;
                 }
 
                 seek = direction * speed;
@@ -478,6 +619,7 @@ public class EnemyMovementSystem : MonoBehaviour
         System.Array.Resize(ref goals, size);
         System.Array.Resize(ref stops, size);
         System.Array.Resize(ref followsField, size);
+        System.Array.Resize(ref routeTo, size);
         System.Array.Resize(ref faces, size);
     }
 }

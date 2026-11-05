@@ -300,7 +300,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &48912370
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -590,6 +590,8 @@ MonoBehaviour:
   baseSpawnGap: 2
   baseSpawnBand: 4
   mapHalfSize: 83
+  mapEdgeMargin: 2
+  offscreenPushStep: 1
 --- !u!4 &147156300
 Transform:
   m_ObjectHideFlags: 0
@@ -2048,7 +2050,7 @@ MonoBehaviour:
   waitForBaseChunk: 1
   layout: {fileID: 1558303616}
   treeCount: 128
-  areaHalfSize: 80
+  areaHalfSize: 103
   lightShare: 0.1
   roundLightShare: 0.05
   minSpacing: 5
@@ -2965,7 +2967,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &1514758000
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3224,7 +3226,7 @@ MonoBehaviour:
   - chunk: {fileID: 11400000, guid: dc4d7af59d49c464f923278ddcd11451, type: 2}
     slot: {x: -1, y: 0}
     rotation: 0
-  maxSlotReach: 2
+  maxSlotReach: 3
   showBlocks: 1
   material: {fileID: 2100000, guid: 92beabca2fea2e643bb40d917cdbd77b, type: 2}
   wallHeight: 1.5
@@ -3247,6 +3249,7 @@ MonoBehaviour:
   growDuration: 1.5
   hysteresis: 1
   fallbackBaseRadius: 1.2
+  centreOnBuild: 0
 --- !u!1 &1575583240
 GameObject:
   m_ObjectHideFlags: 0
@@ -4030,8 +4033,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 069fab6943dd5b7458a17460883e1bd5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BuildGrid
-  width: 84
-  height: 84
+  width: 108
+  height: 108
   cellSize: 1
   baseRadius: 2.2
 --- !u!4 &1821767659
@@ -4064,6 +4067,63 @@ MonoBehaviour:
   grid: {fileID: 1821767658}
   wallAvoidRange: 1
   wallAvoidCost: 12
+--- !u!1001 &1876739705
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3919028126807780305, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7484602575782314081, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
+      propertyPath: m_Name
+      value: MapGreybox
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: de5291190d0f0f646b9275342a10d27e, type: 3}
 --- !u!1 &1892301400
 GameObject:
   m_ObjectHideFlags: 0
@@ -4253,6 +4313,7 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: 4b2ccecef30a342409cead1c89f4d273, type: 2}
   wallRadius: 0.4
   hunterLightGap: 0.5
+  fallGravity: 30
 --- !u!4 &2125069817
 Transform:
   m_ObjectHideFlags: 0
@@ -4299,3 +4360,4 @@ SceneRoots:
   - {fileID: 1163108118}
   - {fileID: 1575583243}
   - {fileID: 1514758004}
+  - {fileID: 1876739705}

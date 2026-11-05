@@ -13,7 +13,8 @@
  *   while writing many cells, then call NotifyChanged once) so listeners rebuild only when the layout changes.
  * - Changing width/height/cellSize/baseRadius in the inspector during Play rebuilds the grid, clearing written cells, and
  *   raises Rebuilt (BaseLayout re-applies itself on it).
- * - Size: 84 x 84 = the core slot + two rings of 12-cell chunk slots (60 cells) + a 12-cell open margin on every side.
+ * - Size (SampleScene since 2026-10-30): 108 x 108 = the core slot + three rings of 12-cell chunk slots (84 cells,
+ *   BaseLayout.maxSlotReach 3) + a 12-cell open margin on every side (was 84 x 84 for two rings).
  */
 
 using System;
