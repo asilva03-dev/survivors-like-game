@@ -26,8 +26,9 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
+  - {fileID: 4403445551207147560}
   - {fileID: 6083937566226494779}
-  m_RendererFeatureMap: ad6b866f10d7b46c3bb5957efb7c6e54
+  m_RendererFeatureMap: ad6b866f10d7b46c28e879fb652e1c3d3bb5957efb7c6e54
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3
@@ -56,6 +57,27 @@ MonoBehaviour:
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
   m_TileOnlyMode: 0
+--- !u!114 &4403445551207147560
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c464957009830a47978f98ff2bc88a2, type: 3}
+  m_Name: ScreenOutline
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenOutlineFeature
+  m_Active: 1
+  injectionPoint: 450
+  fetchColorBuffer: 1
+  requirements: 3
+  passMaterial: {fileID: 2100000, guid: 8618dac3e9ce8f04487276331b975d77, type: 2}
+  passIndex: 0
+  bindDepthStencilAttachment: 0
+  m_Version: 1
+  includeSceneView: 0
 --- !u!114 &6083937566226494779
 MonoBehaviour:
   m_ObjectHideFlags: 1
