@@ -15,7 +15,7 @@ MonoBehaviour:
   attackInterval: 5
   damage: 4
   resourceDamageMultiplier: 1
-  targets: 3
+  targets: 1
   range: 12
   ringRadius: 1.5
   turnSpeed: 540

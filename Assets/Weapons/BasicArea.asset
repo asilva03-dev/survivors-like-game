@@ -15,7 +15,7 @@ MonoBehaviour:
   attackInterval: 1
   damage: 3
   resourceDamageMultiplier: 0.6
-  targets: 3
+  targets: 1
   radius: 4.5
   maxTargets: -1
   color: {r: 1, g: 0, b: 0, a: 0.3}

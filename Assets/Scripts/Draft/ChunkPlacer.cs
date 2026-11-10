@@ -6,6 +6,9 @@
  * - Mouse wheel turns the ghost a quarter turn (up = clockwise). It starts at the rotation the card had.
  * - Left click on a valid spot places the chunk (BaseLayout.Place) and ends the mode. Esc discards the piece (there is
  *   no inventory yet), except for the base chunk: it is locked to the core slot, can only be turned, and must be placed.
+ * - Trees block placement (user, 2026-11-10): a spot is also invalid while any live tree stands on or within the
+ *   TreeSpawner's layoutClearance of the chunk ("chop them first"). Stumps don't block. BaseLayout.CanPlace itself
+ *   (and so fixed test layouts) is unchanged.
  * - While active, player mouse attacks are blocked (PlayerInputGate).
  * - The ghost is one runtime mesh (floor tiles per cell, boxes for walls) with vertex colours, drawn with a tinted
  *   instance of ghostMaterial (an unlit transparent vertex-colour material, e.g. GridDebug.mat).
@@ -35,6 +38,7 @@ public class ChunkPlacer : MonoBehaviour
     private string reason = "";
     private bool dirty;
     private int meshRotation = -1;
+    private TreeSpawner trees;
 
     private GameObject ghost;
     private Mesh mesh;
@@ -182,6 +186,15 @@ public class ChunkPlacer : MonoBehaviour
     private void Refresh()
     {
         valid = layout.CanPlace(chunk, slot, rotation, out reason);
+        if (valid)
+        {
+            int blocking = TreesInTheWay();
+            if (blocking > 0)
+            {
+                valid = false;
+                reason = blocking == 1 ? "A tree is in the way: chop it first." : blocking + " trees are in the way: chop them first.";
+            }
+        }
         if (meshRotation != rotation)
         {
             BuildMesh();
@@ -195,6 +208,22 @@ public class ChunkPlacer : MonoBehaviour
             ? "Place your base   Scroll: rotate   Click: place"
             : "Scroll: rotate   Click: place   Esc: discard";
         ui.ShowHint(chunk.name + " (" + rotation * 90 + "°)   " + controls, valid ? "Click to place here." : reason, valid);
+    }
+
+    // Live trees the chunk would cover at the current slot/rotation (0 without a TreeSpawner).
+    private int TreesInTheWay()
+    {
+        if (trees == null)
+        {
+            trees = FindAnyObjectByType<TreeSpawner>();
+            if (trees == null)
+            {
+                return 0;
+            }
+        }
+        Vector2Int origin = layout.SlotOrigin(slot);
+        Vector2Int size = new Vector2Int(chunk.RotatedWidth(rotation), chunk.RotatedHeight(rotation));
+        return trees.CountTreesIn(layout.CellCorner(origin), layout.CellCorner(origin + size));
     }
 
     private void Finish(bool placed)

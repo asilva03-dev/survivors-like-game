@@ -15,7 +15,7 @@ MonoBehaviour:
   attackInterval: 0.4
   damage: 7
   resourceDamageMultiplier: 1
-  targets: 3
+  targets: 1
   projectileCount: 8
   orbitRadius: 2.5
   orbitHeight: 0

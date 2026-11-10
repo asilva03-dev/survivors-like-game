@@ -8,6 +8,8 @@
  * - The leaves child wobbles on every hit (DOTween punch rotation + scale) while the trunk stays
  *   still. The tween is killed and the leaves reset when the tree is disabled, so pooled trees come
  *   back clean.
+ * - Rustle(push) (2026-11-10): a smaller shake tipping the leaves away from the player wading through (PlayerWading);
+ *   skipped while a shake is still playing. The root collider is a trigger since then, so the player walks through.
  * - woodYield is how many wood drops (one wood each) WoodDropSpawner bursts out when the tree dies.
  *   Edit it on the Tree prefab (Resource Tree > Wood Yield).
  * - Named ResourceTree because UnityEngine already has a Tree class.
@@ -27,6 +29,13 @@ public class ResourceTree : Damageable
     [SerializeField, Min(0.05f)] private float wobbleDuration = 0.45f;
     [SerializeField, Min(1)] private int wobbleVibrato = 8;
     [SerializeField, Range(0f, 1f)] private float wobbleElasticity = 0.6f;
+
+    [Header("Rustle (player wading through)")]
+    [Tooltip("Degrees the leaves tip away from the player wading through.")]
+    [SerializeField, Min(0f)] private float rustleAngle = 6f;
+    [SerializeField, Min(0.05f)] private float rustleDuration = 0.5f;
+    [SerializeField, Min(1)] private int rustleVibrato = 6;
+    [SerializeField, Range(0f, 1f)] private float rustleElasticity = 0.5f;
 
     private Vector3 leavesScale;
     private Quaternion leavesRotation;
@@ -77,6 +86,24 @@ public class ResourceTree : Damageable
         ResetLeaves();
         leaves.DOPunchRotation(wobbleRotation, wobbleDuration, wobbleVibrato, wobbleElasticity);
         leaves.DOPunchScale(wobbleScale, wobbleDuration, wobbleVibrato, wobbleElasticity);
+    }
+
+    /// <summary>A small leaf shake tipping away along `push` (flat world direction); skipped while another shake plays.</summary>
+    public void Rustle(Vector3 push)
+    {
+        if (leaves == null || DOTween.IsTweening(leaves))
+        {
+            return;
+        }
+        push.y = 0f;
+        if (push.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+        Vector3 axis = Vector3.Cross(Vector3.up, push.normalized);
+        Transform space = leaves.parent != null ? leaves.parent : leaves;
+        Vector3 punch = space.InverseTransformDirection(axis).normalized * rustleAngle;
+        leaves.DOPunchRotation(punch, rustleDuration, rustleVibrato, rustleElasticity);
     }
 
     private void ResetLeaves()

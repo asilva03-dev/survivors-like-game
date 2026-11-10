@@ -60,6 +60,8 @@ public class BaseLight : MonoBehaviour
     public float Radius { get; private set; }
     public float TargetRadius { get; private set; }
     public float Hysteresis => hysteresis;
+    public float Margin => margin;
+    public float ExtraRadius => extraRadius;
     public bool IsPlayerInside { get; private set; } = true;
 
     private void Awake()

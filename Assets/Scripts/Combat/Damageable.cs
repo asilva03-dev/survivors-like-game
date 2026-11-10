@@ -14,7 +14,8 @@
  *   transform actually moved, so weapons can lead moving targets. Zero for static things and right
  *   after the object is enabled (pooled objects teleport on spawn).
  * - All holds every enabled Damageable so systems never need scene searches. Health resets to full
- *   in OnEnable, so pooled objects come back healthy.
+ *   in OnEnable, so pooled objects come back healthy. Listed = false takes a static thing out of All while
+ *   it is far from the player (TreeSpawner does this for distant trees, 2026-11-10) without touching its health.
  * - Damaged (target, amount) fires on every hit, before death is handled, so killing blows are
  *   reported. Died fires once when health reaches 0; after that the object disables itself (pooled
  *   owners may release it back to their pool from the Died handler).
@@ -65,6 +66,7 @@ public class Damageable : MonoBehaviour, IDamageable
     private float health;
     private Vector3 lastPosition;
     private Vector3 velocity;
+    private bool listed;
 
     public Vector3 AimPoint => transform.position + aimOffset;
     public Color DamageNumberColor => damageNumberColor;
@@ -87,10 +89,42 @@ public class Damageable : MonoBehaviour, IDamageable
         lastPosition = transform.position;
         velocity = Vector3.zero;
         All.Add(this);
+        listed = true;
+    }
+
+    /// <summary>
+    /// Whether this is in All (every enabled Damageable is, by default). Static things far from the player (distant
+    /// trees) can be taken out so the per-frame target loops skip them; they keep their health, their collider still
+    /// stops bullets, and they skip the velocity measurement while out. Re-enabling the object lists it again.
+    /// </summary>
+    public bool Listed
+    {
+        get { return listed; }
+        set
+        {
+            if (value == listed || (value && !isActiveAndEnabled))
+            {
+                return;
+            }
+            listed = value;
+            if (value)
+            {
+                lastPosition = transform.position;
+                All.Add(this);
+            }
+            else
+            {
+                All.Remove(this);
+            }
+        }
     }
 
     private void LateUpdate()
     {
+        if (!listed)
+        {
+            return;
+        }
         float dt = Time.deltaTime;
         Vector3 position = transform.position;
 
@@ -106,7 +140,11 @@ public class Damageable : MonoBehaviour, IDamageable
 
     protected virtual void OnDisable()
     {
-        All.Remove(this);
+        if (listed)
+        {
+            All.Remove(this);
+        }
+        listed = false;
     }
 
     // True while the object ignores hits (the player's invulnerability frames); projectiles pass through it.

@@ -10,7 +10,9 @@
  * - Push(direction, distance, duration) shoves the player along a direction (the axe lunge): an ease-out
  *   shove that adds to the normal movement, covering `distance` units over `duration` seconds; a new push
  *   replaces the old one.
- * - MoveSpeedMultiplier slows walking (set by the melee weapon while charging).
+ * - MoveSpeedMultiplier slows walking (set by the melee weapon while charging). WadeSpeedMultiplier also slows walking
+ *   and Wading blocks starting a dash or a jump (both set by PlayerWading while the player is inside a tree; a dash,
+ *   leap or slide already going carries on).
  * - Inputs are defined here with default bindings and can be edited in the inspector.
  * - Slide (Ctrl / gamepad east, anywhere): pressed on the ground while moving faster than slideMinSpeed (in practice a
  *   dash), the player slides along the current velocity at slideSpeedKept x that speed; the speed above walking fades
@@ -155,6 +157,11 @@ public class PlayerController : MonoBehaviour
     // Scales walking speed (not the dash); the melee weapon lowers it while charging.
     public float MoveSpeedMultiplier { get; set; } = 1f;
 
+    // Wading through trees (PlayerWading, 2026-11-10): its own walking slow (multiplied with MoveSpeedMultiplier, so
+    // the axe and the trees never overwrite each other), and no new dash or jump while it is on.
+    public float WadeSpeedMultiplier { get; set; } = 1f;
+    public bool Wading { get; set; }
+
     private void Reset()
     {
         AddMoveBindings();
@@ -230,7 +237,7 @@ public class PlayerController : MonoBehaviour
     /// <summary>Starts a jump if allowed (grounded, inside the light). Used by the input and by tests.</summary>
     public bool TryJump()
     {
-        if (!IsGrounded || jumpRequested || !InLight)
+        if (!IsGrounded || jumpRequested || !InLight || Wading)
         {
             return false;
         }
@@ -353,7 +360,7 @@ public class PlayerController : MonoBehaviour
 
             case Mode.Normal:
                 if (IsGrounded && !jumpRequested && dashAction.WasPressedThisFrame() && !PlayerInputGate.DashBlocked
-                    && stamina.TrySpend(dashStaminaCost))
+                    && !Wading && stamina.TrySpend(dashStaminaCost))
                 {
                     mode = Mode.Dashing;
                     dashTimer = dashDuration;
@@ -397,7 +404,7 @@ public class PlayerController : MonoBehaviour
                 break;
 
             default:
-                targetVelocity = direction * (moveSpeed * MoveSpeedMultiplier);
+                targetVelocity = direction * (moveSpeed * MoveSpeedMultiplier * WadeSpeedMultiplier);
                 break;
         }
 

@@ -2435,13 +2435,30 @@ MonoBehaviour:
   spawnOnStart: 1
   waitForBaseChunk: 1
   layout: {fileID: 1558303616}
-  treeCount: 128
+  treePrewarm: 1000
+  stumpPrewarm: 64
   areaHalfSize: 103
-  lightShare: 0.1
   roundLightShare: 0.05
   minSpacing: 5
   layoutClearance: 2
   scaleRange: {x: 0.9, y: 1.15}
+  listRadius: 30
+  listInterval: 0.25
+  seed: 0
+  ringStartOffset: 0
+  thickWidth: 15
+  fadeWidth: 25
+  thickSpacing: 3.5
+  minFadeDensity: 0.08
+  fillAttempts: 3
+  sparsePer100: 0.4
+  wedgeCountRange: {x: 0, y: 3}
+  leewayRings: 1
+  wedgeBaseHalfWidth: {x: 16, y: 26}
+  wedgeTipHalfWidth: {x: 5, y: 9}
+  wedgeDepth: {x: 0, y: 0.6}
+  wedgeRaggedness: 3
+  wedgeGap: 8
 --- !u!4 &914894359
 Transform:
   m_ObjectHideFlags: 0
@@ -4009,6 +4026,7 @@ GameObject:
   - component: {fileID: 1813681615}
   - component: {fileID: 1813681616}
   - component: {fileID: 1813681617}
+  - component: {fileID: 1813681618}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -4418,6 +4436,22 @@ MonoBehaviour:
   behindOffset: 0.45
   heightOffset: 0.25
   color: {r: 0.88, g: 0.87, b: 0.84, a: 1}
+--- !u!114 &1813681618
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1813681602}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccbdb03f2c01d8342b92d49321dbb2a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerWading
+  wadeRadius: 1.2
+  speedMultiplier: 0.7
+  rustleInterval: 0.4
+  movingSpeed: 0.5
 --- !u!1 &1821767656
 GameObject:
   m_ObjectHideFlags: 0
