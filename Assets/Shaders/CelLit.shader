@@ -9,6 +9,10 @@
 // - Ambient (the scene's low ambient light) is added smooth, so the night look stays.
 // - Has ShadowCaster, DepthOnly and DepthNormals passes so shadows, the depth copy and the darkness pass work as with
 //   the Lit shader. Texture + colour like URP Lit (_BaseMap, _BaseColor).
+// - Ground textures (2026-11-10, user: the ground looked plain): with "World Space Ground Textures" on (_WORLD_UV),
+//   _DetailMap is tiled from above in world space every _DetailTiling units and _MacroMap every _MacroTiling units. Both
+//   are linear greyscale tints around 0.5 (0.5 = no change): colour x lerp(1, 2 x sample, strength). Off by default;
+//   only the ground materials turn it on.
 Shader "Custom/CelLit"
 {
     Properties
@@ -23,6 +27,15 @@ Shader "Custom/CelLit"
         [Header(Point lights)]
         _PointBands ("Point Light Bands", Range(1, 6)) = 3
         _PointMax ("Point Light Full Brightness", Range(0.05, 4)) = 2
+        _PointSoftness ("Point Light Band Softness (0.5 = smooth)", Range(0.001, 0.5)) = 0.5
+        [Header(Ground textures)]
+        [Toggle(_WORLD_UV)] _WorldUV ("World Space Ground Textures", Float) = 0
+        [NoScaleOffset] _DetailMap ("Detail (greyscale, 0.5 = none)", 2D) = "grey" {}
+        _DetailTiling ("Detail Tile Size (units)", Float) = 4
+        _DetailStrength ("Detail Strength", Range(0, 1)) = 0.5
+        [NoScaleOffset] _MacroMap ("Patches (greyscale, 0.5 = none)", 2D) = "grey" {}
+        _MacroTiling ("Patch Tile Size (units)", Float) = 48
+        _MacroStrength ("Patch Strength", Range(0, 1)) = 0.5
     }
 
     SubShader
@@ -41,6 +54,11 @@ Shader "Custom/CelLit"
             half _ShadowFloor;
             half _PointBands;
             half _PointMax;
+            half _PointSoftness;
+            float _DetailTiling;
+            half _DetailStrength;
+            float _MacroTiling;
+            half _MacroStrength;
         CBUFFER_END
         ENDHLSL
 
@@ -59,11 +77,16 @@ Shader "Custom/CelLit"
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
+            #pragma shader_feature_local_fragment _WORLD_UV
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_DetailMap);
+            SAMPLER(sampler_DetailMap);
+            TEXTURE2D(_MacroMap);
+            SAMPLER(sampler_MacroMap);
 
             struct Attributes
             {
@@ -115,7 +138,7 @@ Shader "Custom/CelLit"
                 {
                     return 0;
                 }
-                half banded = Band(brightness / _PointMax, _PointBands, _Softness) * _PointMax;
+                half banded = Band(brightness / _PointMax, _PointBands, _PointSoftness) * _PointMax;
                 return colour * (banded / brightness);
             }
 
@@ -123,6 +146,12 @@ Shader "Custom/CelLit"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv) * _BaseColor;
+                #if defined(_WORLD_UV)
+                    float2 groundUV = input.positionWS.xz;
+                    half detail = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, groundUV / max(_DetailTiling, 0.01)).r;
+                    half macro = SAMPLE_TEXTURE2D(_MacroMap, sampler_MacroMap, groundUV / max(_MacroTiling, 0.01)).r;
+                    albedo.rgb *= lerp(1.0, detail * 2.0, _DetailStrength) * lerp(1.0, macro * 2.0, _MacroStrength);
+                #endif
                 float3 normalWS = normalize(input.normalWS);
 
                 InputData inputData = (InputData)0;

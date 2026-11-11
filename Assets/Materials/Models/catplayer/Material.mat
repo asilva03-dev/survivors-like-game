@@ -120,6 +120,7 @@ Material:
     - _Parallax: 0.02
     - _PointBands: 3
     - _PointMax: 2
+    - _PointSoftness: 0.5
     - _QueueOffset: 0
     - _ReceiveShadows: 1
     - _ShadowFloor: 0.3

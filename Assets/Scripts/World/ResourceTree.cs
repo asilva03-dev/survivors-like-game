@@ -8,7 +8,7 @@
  * - The leaves child wobbles on every hit (DOTween punch rotation + scale) while the trunk stays
  *   still. The tween is killed and the leaves reset when the tree is disabled, so pooled trees come
  *   back clean.
- * - Rustle(push) (2026-11-10): a smaller shake tipping the leaves away from the player wading through (PlayerWading);
+ * - Rustle(push) (2026-11-10; IWadeable, shared with DecorBush): a smaller shake tipping the leaves away from the player wading through (PlayerWading);
  *   skipped while a shake is still playing. The root collider is a trigger since then, so the player walks through.
  * - woodYield is how many wood drops (one wood each) WoodDropSpawner bursts out when the tree dies.
  *   Edit it on the Tree prefab (Resource Tree > Wood Yield).
@@ -18,7 +18,7 @@
 using DG.Tweening;
 using UnityEngine;
 
-public class ResourceTree : Damageable
+public class ResourceTree : Damageable, IWadeable
 {
     [SerializeField] private Transform leaves;
     [SerializeField, Min(0)] private int woodYield = 5;

@@ -2,12 +2,13 @@
  * PlayerWading
  * On the Player (2026-11-10, user): the player walks through trees instead of bumping into them (tree colliders are
  * triggers), but wading through one slows walking and blocks starting a dash or a jump; the trees rustle as the player
- * passes.
+ * passes. Decoration bushes (GroundDecorations, step 3) work the same way.
  *
- * - Wading = the player's centre is within wadeRadius (flat) of any live tree (TreeSpawner.LiveTrees, a plain distance
- *   loop each frame). While wading: PlayerController.WadeSpeedMultiplier = speedMultiplier and PlayerController.Wading
- *   is on (no new dash or jump; one already going carries on).
- * - Rustle: a tree rustles (ResourceTree.Rustle, away from the player) when the player enters it, and again every
+ * - Wading = the player's centre is within wadeRadius (flat) of any live tree (TreeSpawner.LiveTrees) or within a bush's
+ *   own WadeRadius (GroundDecorations.LiveBushes); plain distance loops each frame. While wading:
+ *   PlayerController.WadeSpeedMultiplier = speedMultiplier and PlayerController.Wading is on (no new dash or jump; one
+ *   already going carries on).
+ * - Rustle: a tree or bush rustles (IWadeable.Rustle, away from the player) when the player enters it, and again every
  *   rustleInterval seconds while the player keeps moving inside it.
  */
 
@@ -26,14 +27,19 @@ public class PlayerWading : MonoBehaviour
     [Tooltip("The player counts as moving above this flat speed.")]
     [SerializeField, Min(0f)] private float movingSpeed = 0.5f;
 
-    private readonly List<ResourceTree> touching = new List<ResourceTree>();
+    private readonly List<IWadeable> touching = new List<IWadeable>();
     private readonly List<float> lastRustle = new List<float>();
-    private readonly List<ResourceTree> nowTouching = new List<ResourceTree>();
+    private readonly List<IWadeable> nowTouching = new List<IWadeable>();
     private readonly List<float> nowRustle = new List<float>();
 
     private PlayerController controller;
     private Rigidbody body;
     private TreeSpawner trees;
+    private GroundDecorations decorations;
+    private Vector3 position;
+    private Vector3 velocity;
+    private bool moving;
+    private float now;
 
     public bool IsWading { get; private set; }
 
@@ -55,44 +61,35 @@ public class PlayerWading : MonoBehaviour
         if (trees == null)
         {
             trees = FindAnyObjectByType<TreeSpawner>();
-            if (trees == null)
-            {
-                SetWading(false);
-                return;
-            }
+        }
+        if (decorations == null)
+        {
+            decorations = FindAnyObjectByType<GroundDecorations>();
         }
 
-        Vector3 position = transform.position;
-        Vector3 velocity = body != null ? body.linearVelocity : Vector3.zero;
+        position = transform.position;
+        velocity = body != null ? body.linearVelocity : Vector3.zero;
         velocity.y = 0f;
-        bool moving = velocity.sqrMagnitude > movingSpeed * movingSpeed;
-        float sqrRadius = wadeRadius * wadeRadius;
-        float now = Time.time;
+        moving = velocity.sqrMagnitude > movingSpeed * movingSpeed;
+        now = Time.time;
 
         nowTouching.Clear();
         nowRustle.Clear();
-        IReadOnlyList<ResourceTree> live = trees.LiveTrees;
-        for (int i = 0; i < live.Count; i++)
+        if (trees != null)
         {
-            ResourceTree tree = live[i];
-            Vector3 offset = tree.transform.position - position;
-            offset.y = 0f;
-            if (offset.sqrMagnitude > sqrRadius)
+            IReadOnlyList<ResourceTree> live = trees.LiveTrees;
+            for (int i = 0; i < live.Count; i++)
             {
-                continue;
+                Check(live[i], live[i].transform.position, wadeRadius);
             }
-
-            int before = touching.IndexOf(tree);
-            float last = before >= 0 ? lastRustle[before] : float.NegativeInfinity;
-            bool entered = before < 0;
-            if (entered || (moving && now - last >= rustleInterval))
+        }
+        if (decorations != null)
+        {
+            IReadOnlyList<DecorBush> bushes = decorations.LiveBushes;
+            for (int i = 0; i < bushes.Count; i++)
             {
-                // Tip away from the player, or along the movement when standing on the trunk.
-                tree.Rustle(offset.sqrMagnitude > 0.0001f ? offset : velocity);
-                last = now;
+                Check(bushes[i], bushes[i].transform.position, bushes[i].WadeRadius);
             }
-            nowTouching.Add(tree);
-            nowRustle.Add(last);
         }
 
         touching.Clear();
@@ -100,6 +97,27 @@ public class PlayerWading : MonoBehaviour
         lastRustle.Clear();
         lastRustle.AddRange(nowRustle);
         SetWading(touching.Count > 0);
+    }
+
+    // Within radius: counts as wading, rustles on entry and every rustleInterval while moving.
+    private void Check(IWadeable thing, Vector3 centre, float radius)
+    {
+        Vector3 offset = centre - position;
+        offset.y = 0f;
+        if (offset.sqrMagnitude > radius * radius)
+        {
+            return;
+        }
+        int before = touching.IndexOf(thing);
+        float last = before >= 0 ? lastRustle[before] : float.NegativeInfinity;
+        if (before < 0 || (moving && now - last >= rustleInterval))
+        {
+            // Tip away from the player, or along the movement when standing on its centre.
+            thing.Rustle(offset.sqrMagnitude > 0.0001f ? offset : velocity);
+            last = now;
+        }
+        nowTouching.Add(thing);
+        nowRustle.Add(last);
     }
 
     private void SetWading(bool wading)

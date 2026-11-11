@@ -1287,6 +1287,88 @@ MonoBehaviour:
   boostLagTime: 0.2
   recoverTime: 0.15
   verticalSmoothTime: 0.6
+--- !u!1 &384386728
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 384386730}
+  - component: {fileID: 384386729}
+  m_Layer: 0
+  m_Name: GroundDecorations
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &384386729
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 384386728}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46ae609143d904f41aa09a0126679222, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GroundDecorations
+  grassMaterial: {fileID: 2100000, guid: f8d59571c6e061e47b8ca83e3f01b649, type: 2}
+  layerName: Decoration
+  seed: 0
+  tileSize: 32
+  fallbackHalfSize: 103
+  layoutClearance: 0.3
+  patchScale: 0.09
+  patchThreshold: 0.66
+  patchEdge: 0.35
+  tuftsPerSquareUnit: 0.9
+  tuftHeight: {x: 0.7, y: 1.1}
+  tuftRadius: 0.22
+  bladesPerTuft: {x: 3, y: 4}
+  bladeWidth: 0.3
+  shoulderHeight: 0.4
+  shoulderWidth: 1.15
+  foldShade: 0.72
+  grassColorA: {r: 0.5372549, g: 0.6431373, b: 0.46666667, a: 1}
+  grassColorB: {r: 0.6117647, g: 0.72156864, b: 0.5254902, a: 1}
+  rootShade: 0.65
+  clustersPer1000: 1.5
+  flowersPerCluster: {x: 3, y: 8}
+  clusterRadius: 1.2
+  flowerSize: {x: 0.35, y: 0.5}
+  flowerLift: 0.03
+  flowerColors:
+  - {r: 0.96, g: 0.62, b: 0.78, a: 1}
+  - {r: 0.98, g: 0.86, b: 0.38, a: 1}
+  - {r: 0.96, g: 0.95, b: 0.9, a: 1}
+  - {r: 0.74, g: 0.64, b: 0.94, a: 1}
+  flowerCentreColor: {r: 0.98, g: 0.8, b: 0.3, a: 1}
+  bushMaterial: {fileID: 2100000, guid: 85773dad03384664fb2f142cecaa7eed, type: 2}
+  bushesPer1000: 0.5
+  bushSize: {x: 1.8, y: 2.6}
+  bushHeightRatio: 0.6
+  bushClearance: 0.5
+  bushWadeExtra: 0.3
+  bushShapes: 4
+--- !u!4 &384386730
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 384386728}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -4847,3 +4929,4 @@ SceneRoots:
   - {fileID: 1514758004}
   - {fileID: 1876739705}
   - {fileID: 819754572}
+  - {fileID: 384386730}
