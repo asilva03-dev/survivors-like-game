@@ -10,8 +10,11 @@
  *   back clean.
  * - Rustle(push) (2026-11-10; IWadeable, shared with DecorBush): a smaller shake tipping the leaves away from the player wading through (PlayerWading);
  *   skipped while a shake is still playing. The root collider is a trigger since then, so the player walks through.
- * - woodYield is how many wood drops (one wood each) WoodDropSpawner bursts out when the tree dies.
- *   Edit it on the Tree prefab (Resource Tree > Wood Yield).
+ * - woodYield is how many wood drops (one wood each) a tree gives in total. Edit it on the Tree prefab (Resource Tree >
+ *   Wood Yield). Since 2026-11-20 (user) part of it drops on every hit: TakeHitWood(damage) picks the hitWood row with
+ *   the highest minDamage the hit reaches (50: 2-3, 100: 4-5, 150: all 15), capped by what is left; when the tree
+ *   breaks, TakeRemainingWood gives the rest (WoodDropSpawner launches both). Reset when the tree is enabled (pooling).
+ * - showDamageNumbers (off since 2026-11-20, user): no floating numbers on trees (Damageable.ShowsDamageNumbers).
  * - Named ResourceTree because UnityEngine already has a Tree class.
  */
 
@@ -20,8 +23,26 @@ using UnityEngine;
 
 public class ResourceTree : Damageable, IWadeable
 {
+    [System.Serializable]
+    public struct HitWood
+    {
+        [Tooltip("A hit dealing at least this much damage drops wood from this row (the highest matching row wins).")]
+        public float minDamage;
+        public int minDrops;
+        public int maxDrops;
+    }
+
     [SerializeField] private Transform leaves;
     [SerializeField, Min(0)] private int woodYield = 5;
+    [Tooltip("Wood dropped on each hit by its damage (never more than what is left of woodYield); the rest drops when the tree breaks.")]
+    [SerializeField] private HitWood[] hitWood =
+    {
+        new HitWood { minDamage = 50f, minDrops = 2, maxDrops = 3 },
+        new HitWood { minDamage = 100f, minDrops = 4, maxDrops = 5 },
+        new HitWood { minDamage = 150f, minDrops = 15, maxDrops = 15 }
+    };
+    [Tooltip("Show floating damage numbers when the tree is hit.")]
+    [SerializeField] private bool showDamageNumbers;
 
     [Header("Leaf wobble")]
     [SerializeField] private Vector3 wobbleRotation = new Vector3(5f, 0f, 5f);
@@ -41,7 +62,41 @@ public class ResourceTree : Damageable, IWadeable
     private Quaternion leavesRotation;
     private bool leavesCached;
 
+    private int woodDropped;
+
     public int WoodYield => woodYield;
+    /// <summary>Wood not dropped yet (woodYield minus what earlier hits dropped).</summary>
+    public int WoodLeft => Mathf.Max(0, woodYield - woodDropped);
+    public override bool ShowsDamageNumbers => showDamageNumbers;
+
+    /// <summary>How much wood a hit of `damage` drops now (from hitWood, capped by what is left); counts it as dropped.</summary>
+    public int TakeHitWood(float damage)
+    {
+        int best = -1;
+        for (int i = 0; i < hitWood.Length; i++)
+        {
+            if (damage >= hitWood[i].minDamage && (best < 0 || hitWood[i].minDamage > hitWood[best].minDamage))
+            {
+                best = i;
+            }
+        }
+        if (best < 0)
+        {
+            return 0;
+        }
+        int count = Random.Range(hitWood[best].minDrops, Mathf.Max(hitWood[best].minDrops, hitWood[best].maxDrops) + 1);
+        count = Mathf.Clamp(count, 0, WoodLeft);
+        woodDropped += count;
+        return count;
+    }
+
+    /// <summary>The rest of the wood when the tree breaks; counts it as dropped.</summary>
+    public int TakeRemainingWood()
+    {
+        int count = WoodLeft;
+        woodDropped += count;
+        return count;
+    }
 
     private void CacheLeaves()
     {
@@ -58,6 +113,7 @@ public class ResourceTree : Damageable, IWadeable
     protected override void OnEnable()
     {
         base.OnEnable();
+        woodDropped = 0;
         CacheLeaves();
         ResetLeaves();
         Damaged += HandleDamaged;

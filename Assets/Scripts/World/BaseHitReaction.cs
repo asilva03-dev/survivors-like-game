@@ -14,6 +14,8 @@
  *   degrees about the rim line, flapFrequency with a random phase/speed per flap, fading over flapDuration).
  *   Flaps only rotate about the hinge, and always end at their exact rest position and rotation.
  * - A charged swing multiplies the amplitudes by chargedMultiplier. A hit during a reaction restarts it.
+ * - OnEnemyHit (2026-11-20, BaseDive: a rat dived into the box) plays the same reaction at enemyHitStrength; a dive
+ *   landing in the first half of the hop adds to the strength (up to maxEnemyStrength) instead of restarting it.
  */
 
 using UnityEngine;
@@ -34,6 +36,11 @@ public class BaseHitReaction : MonoBehaviour, IMeleeReactive
     [SerializeField, Min(0.1f)] private float flapFrequency = 6f;
     [SerializeField, Min(0.01f)] private float flapDuration = 0.6f;
     [SerializeField, Min(1f)] private float chargedMultiplier = 1.5f;
+    [Header("Enemy dives (BaseDive)")]
+    [Tooltip("Strength of the reaction when an enemy dives into the box (1 = a normal axe hit).")]
+    [SerializeField, Min(0f)] private float enemyHitStrength = 1f;
+    [Tooltip("Dives landing early in a running reaction add up to this strength instead of restarting it.")]
+    [SerializeField, Min(0f)] private float maxEnemyStrength = 2f;
 
     private Vector3 visualRest;
     private Vector3[] flapRest;
@@ -143,6 +150,20 @@ public class BaseHitReaction : MonoBehaviour, IMeleeReactive
             flapPhase[i] = Random.Range(0f, 2f * Mathf.PI);
             flapSpeed[i] = Random.Range(0.85f, 1.2f);
         }
+    }
+
+    // An enemy dived into the box (BaseDive). Early in a running reaction the jolt grows (up to maxEnemyStrength)
+    // instead of restarting, so a stream of dives reads as bigger hits, not a jittering box.
+    public void OnEnemyHit()
+    {
+        bool early = elapsed < airTime * 0.5f;
+        if (early)
+        {
+            strength = Mathf.Min(maxEnemyStrength, strength + enemyHitStrength * 0.5f);
+            return;
+        }
+        OnMeleeHit(transform.position, false);
+        strength = enemyHitStrength;
     }
 
     private void LateUpdate()

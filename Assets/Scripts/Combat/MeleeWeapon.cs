@@ -25,7 +25,8 @@
  *   easing back to normal by the end. Targets are hit as the blade passes them (angle between last and
  *   current sweep angle, within reach plus the current extension; each target counts as a disc of
  *   targetRadius so close targets are caught by their edge), once per target per swing, with
- *   damage per category from MeleeStats.DamageFor. Big targets add their Damageable.TargetRadius.
+ *   damage per category from MeleeStats.DamageFor (trees: MeleeStats.TreeDamage / ChargedTreeDamage instead, since
+ *   2026-11-20). Big targets add their Damageable.TargetRadius.
  * - Things the axe cannot damage but that carry an IMeleeReactive (the base) are still swept: they get
  *   OnMeleeHit once per swing and no damage, knockback or hit stop.
  * - All numbers come from the MeleeStats asset. Visual setup (pivot, model rotation and scale, holdHeight)
@@ -300,10 +301,18 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
             return;
         }
 
-        float amount = Stats.DamageFor(target.Category);
-        if (strongSwing)
+        float amount;
+        if (target is ResourceTree)
         {
-            amount *= Stats.ChargedDamageMultiplier;
+            amount = strongSwing ? Stats.ChargedTreeDamage : Stats.TreeDamage;
+        }
+        else
+        {
+            amount = Stats.DamageFor(target.Category);
+            if (strongSwing)
+            {
+                amount *= Stats.ChargedDamageMultiplier;
+            }
         }
 
         if (amount > 0f)

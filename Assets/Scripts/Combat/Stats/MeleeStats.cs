@@ -27,6 +27,9 @@
  * - Hit stop: when a swing hits a resource (tree) the swing animation freezes for hitStopDuration
  *   (normal) or chargedHitStopDuration (charged) seconds. The attack lockout is pushed back by the
  *   same time so attack spacing is unchanged.
+ * - Trees (2026-11-20, user): a tree (ResourceTree) takes treeDamage from a normal swing and chargedTreeDamage from a
+ *   charged one, instead of damage x resourceDamageMultiplier (x chargedDamageMultiplier). Enemies and other
+ *   resources are unchanged.
  * - chargeMoveSpeedMultiplier scales player move speed while charging (1 = no slowdown).
  * - swingCurve maps swing time (0..1) to arc progress (0..1) for easing. The default starts at a normal
  *   pace, speeds up through the strike, then eases out slowly as the swing finishes.
@@ -69,6 +72,12 @@ public class MeleeStats : WeaponStats
     [SerializeField, Min(0.02f)] private float lungeDuration = 0.15f;
 
     [Header("Hit stop (resources)")]
+    [Header("Trees (2026-11-20)")]
+    [Tooltip("Damage a normal swing deals to a tree (replaces damage x resourceDamageMultiplier for trees only).")]
+    [SerializeField, Min(0f)] private float treeDamage = 50f;
+    [Tooltip("Damage a charged swing deals to a tree (no chargedDamageMultiplier on top).")]
+    [SerializeField, Min(0f)] private float chargedTreeDamage = 100f;
+
     [SerializeField, Min(0f)] private float hitStopDuration = 0.06f;
     [SerializeField, Min(0f)] private float chargedHitStopDuration = 0.12f;
 
@@ -120,4 +129,6 @@ public class MeleeStats : WeaponStats
     public AnimationCurve TiltCurve => tiltCurve;
     public float ExtendDistance => extendDistance;
     public float GrowAmount => growAmount;
+    public float TreeDamage => treeDamage;
+    public float ChargedTreeDamage => chargedTreeDamage;
 }

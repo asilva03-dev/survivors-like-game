@@ -164,6 +164,7 @@ GameObject:
   - component: {fileID: 5482191685582331710}
   - component: {fileID: 2697221147786382009}
   - component: {fileID: 3765042302796504201}
+  - component: {fileID: 7807818217668944307}
   m_Layer: 8
   m_Name: Enemy
   m_TagString: Untagged
@@ -230,6 +231,7 @@ MonoBehaviour:
   damageNumberColor: {r: 1, g: 1, b: 1, a: 1}
   visual: {fileID: 8837977647869758168}
   stats: {fileID: 11400000, guid: 31eb99419131e664fa4cc3b73ef2ee15, type: 2}
+  rootAboveFeet: 1
 --- !u!54 &2697221147786382009
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -269,8 +271,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ca8d46590fa5ba247ad88b54f58bd6c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HitFlash
-  flashMaterial: {fileID: 2100000, guid: eb17644b3b2d28a46872d91e500eda2d, type: 2}
+  intensity: 0.45
   duration: 0.08
+--- !u!114 &7807818217668944307
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3996197864113985415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0016493613ff224da7cd22022e48a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RatScuttle
+  model: {fileID: 6121348123274388784}
+  fullSpeed: 1.5
+  stepsPerUnit: 2.2
+  bobHeight: 0.06
+  rollAngle: 7
+  pitchAngle: 4
+  squash: 0.08
 --- !u!1 &4108061326307364189
 GameObject:
   m_ObjectHideFlags: 0
@@ -301,8 +322,101 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2841809374514562272}
+  - {fileID: 6121348123274388784}
   m_Father: {fileID: 4274478298800105809}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &5513606444958904546
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6121348123274388784}
+  - component: {fileID: 8985286169208932926}
+  - component: {fileID: 9222263253939313403}
+  m_Layer: 0
+  m_Name: RatModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6121348123274388784
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5513606444958904546}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -3.3333333, z: 0}
+  m_LocalScale: {x: 3.3333333, y: 3.3333333, z: 3.3333333}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8837977647869758168}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &8985286169208932926
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5513606444958904546}
+  m_Mesh: {fileID: 4300000, guid: 8c9ab8fd3423a6c49947a72928bd006f, type: 2}
+--- !u!23 &9222263253939313403
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5513606444958904546}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 5c07d50c7be311745a40ac5849bd4a8b, type: 2}
+  - {fileID: 2100000, guid: 3d5b614a4073907498d84892cad0b7f0, type: 2}
+  - {fileID: 2100000, guid: 9fc7edc4e426cab428abb3ee2c814c4b, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &6852907262736235528
 GameObject:
   m_ObjectHideFlags: 0
@@ -429,6 +543,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: f43dca2443ab5ad43802c307cea65ade, type: 3}
       propertyPath: m_Name
       value: ratenemy
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f43dca2443ab5ad43802c307cea65ade, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

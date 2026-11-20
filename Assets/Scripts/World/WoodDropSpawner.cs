@@ -2,9 +2,9 @@
  * WoodDropSpawner
  * Bursts collectable wood out of a tree when it dies.
  *
- * - Listens to Damageable.Died; for a ResourceTree it launches ResourceTree.WoodYield pooled
- *   WoodDrops (one wood each) from spawnHeight above the tree's base to random landing spots
- *   between minScatter and maxScatter units away.
+ * - Listens to Damageable.Damaged and Died; for a ResourceTree it launches pooled WoodDrops (one wood each) from
+ *   spawnHeight above the tree's base to random landing spots between minScatter and maxScatter units away: on every
+ *   hit ResourceTree.TakeHitWood(damage) of them, when it dies TakeRemainingWood (the rest of WoodYield) (2026-11-20).
  * - Wood is no longer awarded on tree death; ResourceInventory adds it when a drop is collected.
  * - Drops come from a ComponentPool<WoodDrop> (prewarmed, grows when empty), never Instantiate/Destroy.
  */
@@ -27,21 +27,41 @@ public class WoodDropSpawner : MonoBehaviour
         pool = new ComponentPool<WoodDrop>(dropPrefab, root, prewarmCount);
     }
 
-    private void OnEnable() => Damageable.Died += HandleDied;
+    private void OnEnable()
+    {
+        Damageable.Damaged += HandleDamaged;
+        Damageable.Died += HandleDied;
+    }
 
-    private void OnDisable() => Damageable.Died -= HandleDied;
+    private void OnDisable()
+    {
+        Damageable.Damaged -= HandleDamaged;
+        Damageable.Died -= HandleDied;
+    }
+
+    // Every hit drops part of the wood (by its damage); Damaged fires before Died, so a killing hit drops its share first.
+    private void HandleDamaged(Damageable target, float amount)
+    {
+        if (target is ResourceTree tree)
+        {
+            Launch(tree, tree.TakeHitWood(amount));
+        }
+    }
 
     private void HandleDied(Damageable target)
     {
-        if (!(target is ResourceTree tree))
+        if (target is ResourceTree tree)
         {
-            return;
+            Launch(tree, tree.TakeRemainingWood());
         }
+    }
 
+    private void Launch(ResourceTree tree, int count)
+    {
         Vector3 basePosition = tree.transform.position;
         Vector3 from = basePosition + Vector3.up * spawnHeight;
 
-        for (int i = 0; i < tree.WoodYield; i++)
+        for (int i = 0; i < count; i++)
         {
             float angle = Random.Range(0f, Mathf.PI * 2f);
             float distance = Random.Range(minScatter, maxScatter);

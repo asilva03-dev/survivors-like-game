@@ -11,6 +11,9 @@
  *   big things like the base). Each enemy waits contactInterval seconds after a hit before it can hit again
  *   (the player's invulnerability frames still apply on top); 0 damage disables it. Every Enemy does this, so
  *   new enemy types get it from their stats asset.
+ *   Against the base (2026-11-20, user): when a BaseDive exists in the scene, an enemy reaching the base's edge dives
+ *   into the box instead, dealing baseHitDamage once, and is gone (see BaseDive); contact damage then only hurts the
+ *   player.
  * - Enemy types that attack add their own fields in a subclass (see RangedEnemyStats).
  * - focus (TD slice 4): BaseFocused enemies follow the light rule (see Enemy.RefreshTarget) and only turn on the
  *   player within playerAggroRadius; Hunter enemies only ever target the player (never the base) and keep out of
@@ -42,6 +45,8 @@ public class EnemyStats : ScriptableObject
     [SerializeField, Min(0f)] private float contactDamage = 5f;
     [SerializeField, Min(0.1f)] private float contactRange = 1.4f;
     [SerializeField, Min(0.05f)] private float contactInterval = 1f;
+    [Tooltip("Damage dealt to the base when this enemy dives into the box (once; the enemy is gone after). Placeholder.")]
+    [SerializeField, Min(0f)] private float baseHitDamage = 5f;
 
     public float MaxHealth => maxHealth;
     public float MoveSpeed => moveSpeed;
@@ -52,4 +57,5 @@ public class EnemyStats : ScriptableObject
     public float ContactDamage => contactDamage;
     public float ContactRange => contactRange;
     public float ContactInterval => contactInterval;
+    public float BaseHitDamage => baseHitDamage;
 }

@@ -4,7 +4,8 @@
  *
  * - Put it on a world-space Canvas at the origin with scale 1; numbers are children of it and are
  *   positioned directly in world space.
- * - Listens to Damageable.Damaged, so enemies, trees and anything else damageable all show numbers.
+ * - Listens to Damageable.Damaged, so anything damageable shows numbers, except targets whose
+ *   Damageable.ShowsDamageNumbers is false (trees, ResourceTree.showDamageNumbers, since 2026-11-20).
  *   Each number appears at the target's position plus heightOffset, at a
  *   random point within spawnRadius, so rapid hits do not stack on one spot. Text color comes from
  *   the target's Damageable.DamageNumberColor.
@@ -35,6 +36,10 @@ public class DamageNumberSpawner : MonoBehaviour
 
     private void HandleDamaged(Damageable target, float amount)
     {
+        if (!target.ShowsDamageNumbers)
+        {
+            return;
+        }
         Vector2 offset = Random.insideUnitCircle * style.spawnRadius;
         Vector3 position = target.transform.position + new Vector3(offset.x, style.heightOffset, offset.y);
 

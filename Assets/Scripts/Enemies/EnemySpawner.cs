@@ -8,7 +8,8 @@
  *   in SkippedSpawns) when no valid spot was found, spawning is paused, or there is no player.
  * - Enemies come from ComponentPools built from enemyPrefab (normal) and rangedEnemyPrefab (prewarmed), never
  *   Instantiate/Destroy at runtime. Dead enemies return to the pool they came from via Damageable.Died, and hunters
- *   that retreated off-screen via Enemy.DespawnRequested (no death).
+ *   that retreated off-screen via Enemy.DespawnRequested (no death), and enemies that dived into the base via
+ *   Enemy.EnteredBase (no death, no refund).
  * - Split: each spawn goes to the player with probability PlayerShare, else to the base. PlayerShare is 0 while the
  *   player is in the BaseLight; in the dark it rises from playerShareMin to playerShareMax over playerShareRampTime
  *   seconds and resets when the player returns to the light. No BaseLight = always the dark.
@@ -142,12 +143,14 @@ public class EnemySpawner : MonoBehaviour
     {
         Damageable.Died += HandleDied;
         Enemy.DespawnRequested += HandleDespawn;
+        Enemy.EnteredBase += HandleDespawn;
     }
 
     private void OnDisable()
     {
         Damageable.Died -= HandleDied;
         Enemy.DespawnRequested -= HandleDespawn;
+        Enemy.EnteredBase -= HandleDespawn;
     }
 
     private void Start()

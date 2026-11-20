@@ -30,6 +30,10 @@
  *   contactInterval (see EnemyStats), except a player whose feet are out of bite reach of this enemy's feet (jumping,
  *   on a wall top, or above/below it across a cliff: PlayerController.OutOfBiteReachFrom, measured from FeetY = the
  *   root minus rootAboveFeet, 1 on the rat prefabs). Subclasses that override Update must call base.Update().
+ *   Against the base (2026-11-20, user): with a BaseDive in the scene, an enemy reaching contactRange of the base's
+ *   edge hands itself to BaseDive (which plays the leap into the box and deals the stats' baseHitDamage once) and
+ *   leaves at once through EnterBase (event EnteredBase: no death effect, no drops, no wave refund). Without a
+ *   BaseDive it bites the base as before.
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -57,6 +61,8 @@ public class Enemy : Damageable
 
     // A hunter that retreated off-screen asks to be removed (EnemySpawner releases it to its pool).
     public static event System.Action<Enemy> DespawnRequested;
+    // An enemy dived into the base (BaseDive): gone without dying, never refunded (EnemySpawner releases it).
+    public static event System.Action<Enemy> EnteredBase;
 
     [SerializeField] private Transform visual;
     [SerializeField] private EnemyStats stats;
@@ -227,6 +233,20 @@ public class Enemy : Damageable
         }
     }
 
+    // Dived into the base: removed without dying and without a wave refund (only the spawner listens: it releases it to
+    // its pool), else it just switches off.
+    public void EnterBase()
+    {
+        if (EnteredBase != null)
+        {
+            EnteredBase(this);
+        }
+        if (gameObject.activeSelf)
+        {
+            gameObject.SetActive(false);
+        }
+    }
+
     private static Damageable ClosestBase(Vector3 position)
     {
         List<BaseStructure> bases = BaseStructure.Active;
@@ -271,6 +291,14 @@ public class Enemy : Damageable
 
         if (EdgeDistance(transform.position, Target) <= stats.ContactRange)
         {
+            // Against the base: dive into the box once (BaseDive plays it and deals the damage) instead of biting.
+            BaseStructure targetBase = Target as BaseStructure;
+            if (targetBase != null && BaseDive.Instance != null)
+            {
+                BaseDive.Instance.Dive(this, targetBase);
+                EnterBase();
+                return;
+            }
             Target.TakeDamage(stats.ContactDamage);
             contactCooldown = stats.ContactInterval;
         }

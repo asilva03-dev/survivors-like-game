@@ -157,6 +157,9 @@ public class Damageable : MonoBehaviour, IDamageable
     // touching and shooting at a large structure). 0 = treat as a point, as before.
     public virtual float TargetRadius => 0f;
 
+    // DamageNumberSpawner skips targets that return false (trees since 2026-11-20).
+    public virtual bool ShowsDamageNumbers => true;
+
     public virtual void TakeDamage(float amount)
     {
         health -= amount;

@@ -32,6 +32,8 @@ MonoBehaviour:
   lungeDistance: 0.4
   chargedLungeDistance: 0.8
   lungeDuration: 0.15
+  treeDamage: 50
+  chargedTreeDamage: 100
   hitStopDuration: 0.06
   chargedHitStopDuration: 0.12
   chargeMoveSpeedMultiplier: 0.6
