@@ -4,7 +4,8 @@
  * 2026-11-05): RunDirector calls TrySpawn once per enemy at the current wave's rate. The old steady stream
  * (spawnsPerSecond) and the alive cap (maxEnemies) were removed (the cap was a test aid, user).
  *
- * - TrySpawn(rangedChance): one enemy, split between the base and the player as below; false (nothing spawned, counted
+ * - TrySpawn(rangedChance, armorLayers, bagChance): one enemy (armorLayers extra layers on a layered enemy, 2026-11-20;
+ *   ranged rats and bag rats have no layers and ignore it; bagChance of the base-bound spawns are bag rats), split between the base and the player as below; false (nothing spawned, counted
  *   in SkippedSpawns) when no valid spot was found, spawning is paused, or there is no player.
  * - Enemies come from ComponentPools built from enemyPrefab (normal) and rangedEnemyPrefab (prewarmed), never
  *   Instantiate/Destroy at runtime. Dead enemies return to the pool they came from via Damageable.Died, and hunters
@@ -30,6 +31,10 @@
  *   Base-bound enemies are never recycled (they are walking to the base) and retreating hunters despawn on their own.
  * - SpawnsEnabled pauses/resumes spawning (TrySpawn refuses while paused; the run clock keeps going) and raises
  *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
+ * - Spill (2026-11-20, bag rat): an enemy whose EnemyStats.SpillCount > 0 spills that many basic rats from the normal
+ *   pool where it died (same assignment, the stats' armor layers, pushed out evenly by Enemy.Knockback over spillSpread),
+ *   each then takes the killing hit's leftover damage (Enemy.Overkill, if spillCarriesOverkill), and a chip burst plays
+ *   (ArmorPopEffect, spillBurstColor). Spilled rats use no wave budget. A bag rat that dives into the base spills nothing.
  * - BaseAliveCount / PlayerAliveCount: alive enemies by assignment (debug line).
  * - The player is found by the "Player" tag; the camera is Camera.main.
  */
@@ -48,6 +53,9 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Min(0)] private int rangedPrewarmCount = 10;
     [Tooltip("Basic rats made at load (the pool grows if more are needed, with a small hitch).")]
     [SerializeField, Min(1)] private int prewarmCount = 30;
+    [Tooltip("Bag rat (2026-11-20): base-bound only, a wave's bagChance of base spawns. Empty = none.")]
+    [SerializeField] private Enemy bagEnemyPrefab;
+    [SerializeField, Min(0)] private int bagPrewarmCount = 2;
 
     [Header("Split")]
     [Tooltip("Share of spawns that come for the player the moment they leave the light.")]
@@ -81,6 +89,7 @@ public class EnemySpawner : MonoBehaviour
 
     private ComponentPool<Enemy> pool;
     private ComponentPool<Enemy> rangedPool;
+    private ComponentPool<Enemy> bagPool;
     private Transform player;
     private Rigidbody playerBody;
     private Camera cam;
@@ -136,6 +145,10 @@ public class EnemySpawner : MonoBehaviour
         if (rangedEnemyPrefab != null)
         {
             rangedPool = new ComponentPool<Enemy>(rangedEnemyPrefab, poolRoot, rangedPrewarmCount);
+        }
+        if (bagEnemyPrefab != null)
+        {
+            bagPool = new ComponentPool<Enemy>(bagEnemyPrefab, poolRoot, bagPrewarmCount);
         }
     }
 
@@ -195,7 +208,7 @@ public class EnemySpawner : MonoBehaviour
     public int SkippedSpawns { get; private set; }
 
     /// <summary>Spawns one enemy (base or player share, see the header). False when nothing spawned.</summary>
-    public bool TrySpawn(float rangedChance)
+    public bool TrySpawn(float rangedChance, int armorLayers = 0, float bagChance = 0f)
     {
         if (!spawnsEnabled || player == null)
         {
@@ -218,6 +231,7 @@ public class EnemySpawner : MonoBehaviour
             }
             Enemy hunter = source.Get(point, Quaternion.identity);
             hunter.Assignment = EnemyAssignment.Player;
+            hunter.SetExtraLayers(armorLayers);
             alive.Add(hunter, source);
             return true;
         }
@@ -227,15 +241,46 @@ public class EnemySpawner : MonoBehaviour
             SkippedSpawns++;
             return false;
         }
-        Enemy enemy = pool.Get(point, Quaternion.identity);
+        bool bag = bagPool != null && Random.value < bagChance;
+        ComponentPool<Enemy> baseSource = bag ? bagPool : pool;
+        Enemy enemy = baseSource.Get(point, Quaternion.identity);
         enemy.Assignment = EnemyAssignment.Base;
-        alive.Add(enemy, pool);
+        enemy.SetExtraLayers(armorLayers);
+        alive.Add(enemy, baseSource);
         return true;
     }
 
     private void HandleDied(Damageable target)
     {
-        Release(target as Enemy);
+        Enemy enemy = target as Enemy;
+        if (enemy != null && alive.ContainsKey(enemy) && enemy.Stats != null && enemy.Stats.SpillCount > 0)
+        {
+            Spill(enemy);
+        }
+        Release(enemy);
+    }
+
+    // A bag rat burst: its rats pop out around it, each taking the killing hit's leftover damage.
+    private void Spill(Enemy parent)
+    {
+        EnemyStats stats = parent.Stats;
+        Vector3 point = parent.transform.position;
+        float overkill = stats.SpillCarriesOverkill ? parent.Overkill : 0f;
+        float startAngle = Random.Range(0f, 360f);
+        for (int i = 0; i < stats.SpillCount; i++)
+        {
+            Enemy child = pool.Get(point, Quaternion.identity);
+            child.Assignment = parent.Assignment;
+            child.SetExtraLayers(stats.SpillArmorLayers);
+            alive.Add(child, pool);
+            float angle = (startAngle + i * 360f / stats.SpillCount + Random.Range(-15f, 15f)) * Mathf.Deg2Rad;
+            child.Knockback(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)), stats.SpillSpread, 0.35f);
+            if (overkill > 0f)
+            {
+                child.TakeDamage(overkill);
+            }
+        }
+        ArmorPopEffect.Play(point + Vector3.up * 0.6f, stats.SpillBurstColor);
     }
 
     private void HandleDespawn(Enemy enemy)

@@ -20,42 +20,71 @@ MonoBehaviour:
     budget: 20
     spawnRate: 0.5
     rangedChance: 0.1
+    armorWeights:
+    - 1
+    bagChance: 0
     intensity: 0
   - name: W2 steady
     startTime: 45
     budget: 45
     spawnRate: 1
     rangedChance: 0.2
+    armorWeights:
+    - 4
+    - 1
+    bagChance: 0
     intensity: 1
   - name: W3 rising
     startTime: 90
     budget: 70
     spawnRate: 1.5
     rangedChance: 0.2
+    armorWeights:
+    - 3
+    - 2
+    bagChance: 0
     intensity: 2
   - name: W4 calm (breather)
     startTime: 135
     budget: 25
     spawnRate: 0.5
     rangedChance: 0.1
+    armorWeights:
+    - 1
+    bagChance: 0
     intensity: 0
   - name: W5 rising
     startTime: 180
     budget: 90
     spawnRate: 2
     rangedChance: 0.25
+    armorWeights:
+    - 2
+    - 2
+    - 1
+    bagChance: 0
     intensity: 2
   - name: W6 hard
     startTime: 225
     budget: 130
     spawnRate: 3
     rangedChance: 0.3
+    armorWeights:
+    - 1
+    - 2
+    - 1
+    bagChance: 0.03
     intensity: 3
   - name: W7 hard
     startTime: 270
     budget: 100
     spawnRate: 3.5
     rangedChance: 0.3
+    armorWeights:
+    - 1
+    - 2
+    - 2
+    bagChance: 0.03
     intensity: 3
   hints:
   - intensity: 0

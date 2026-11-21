@@ -83,6 +83,12 @@ public class Damageable : MonoBehaviour, IDamageable
         maxHealth = value;
     }
 
+    // Refills health to maxHealth (layered enemies after their layer count is set at spawn).
+    protected void RestoreFullHealth()
+    {
+        health = maxHealth;
+    }
+
     protected virtual void OnEnable()
     {
         health = maxHealth;

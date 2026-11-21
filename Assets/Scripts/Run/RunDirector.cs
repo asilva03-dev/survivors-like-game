@@ -7,7 +7,8 @@
  *   follows Time.timeScale). It stops at the timeline's runLength: Ended, RunEnded fires once, nothing more spawns.
  * - When a new wave starts, its budget becomes BudgetLeft and whatever the last wave hadn't spawned is dropped.
  * - Spawning: spawnRate x frame time is added to a counter; each whole 1 asks EnemySpawner.TrySpawn(rangedChance) for
- *   one enemy and takes 1 off the budget. A spawn the spawner refuses (no valid spot, or spawns paused with Q) uses no
+ *   one enemy (with the wave's armor mix rolled by RunTimeline.PickArmor, 2026-11-20; bagChance of base-bound ones are bag rats) and takes 1 off the
+ *   budget. Rats spilled from a bag rat use no budget. A spawn the spawner refuses (no valid spot, or spawns paused with Q) uses no
  *   budget: while paused nothing builds up; a missed spot is retried next frame. The counter never holds more than
  *   one frame's worth plus one, so there is no burst afterwards.
  * - Exposes Elapsed, WaveIndex, CurrentWave, BudgetLeft, SpawnedThisWave and the WaveStarted / RunEnded events (HUD,
@@ -193,7 +194,7 @@ public class RunDirector : MonoBehaviour
         spawnCounter = Mathf.Min(spawnCounter + step, step + 1f);
         while (spawnCounter >= 1f && BudgetLeft > 0)
         {
-            if (!spawner.TrySpawn(wave.rangedChance))
+            if (!spawner.TrySpawn(wave.rangedChance, RunTimeline.PickArmor(wave), wave.bagChance))
             {
                 break;
             }

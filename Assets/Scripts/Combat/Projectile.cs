@@ -8,7 +8,8 @@
  * heading and steer at the target from launch. If the target dies mid-flight they ask the firing
  * weapon (retarget callback = the loadout's current target for that weapon) for a new one. They give
  * up for good only after they have lined up on the target and then flown past it.
- * Pierce (GunStats.pierce): a bullet survives that many damageable hits and is released on the next;
+ * Pierce (GunStats.pierce, BTD meaning since 2026-11-20): a bullet makes that many damageable hits (min 1) and is
+ * released on the last;
  * each target is hit at most once per bullet. Non-damageable colliders still stop it; Damageables the weapon
  * cannot target (the base, a Structure) are flown through.
  *
@@ -77,9 +78,9 @@ public class Projectile : MonoBehaviour
         WeaponStats weaponStats, float maxLifetime, Transform ignore,
         Vector3? settleDirection = null, float steerDegreesPerSecond = 0f,
         Damageable homeOn = null, float homingDegreesPerSecond = 0f, System.Func<Damageable> retargetCallback = null,
-        int pierce = 0)
+        int pierce = 1)
     {
-        piercesLeft = Mathf.Max(0, pierce);
+        piercesLeft = Mathf.Max(1, pierce);
         hitTargets.Clear();
         homingActive = homingDegreesPerSecond > 0f && homeOn != null;
         homingTarget = homingActive ? homeOn : null;
@@ -213,17 +214,17 @@ public class Projectile : MonoBehaviour
     }
 
     // Deals damage and remembers the target so a piercing bullet never hits it twice.
-    // Returns true when the bullet has no pierces left and must be released.
+    // Returns true when this was the bullet's last hit (pierce used up) and it must be released.
     private bool HitAndCheckDone(Damageable target)
     {
         Hit(target);
 
+        piercesLeft--;
         if (piercesLeft <= 0)
         {
             return true;
         }
 
-        piercesLeft--;
         hitTargets.Add(target);
         return false;
     }

@@ -13,8 +13,9 @@
  *   turn back to the aim direction at curveTurnSpeed degrees per second, so the arc is only at the
  *   start and they then fly straight, parallel to the others. A higher start angle or lower turn
  *   speed makes a wider, longer arc. projectileSpacing is the side-by-side gap in units.
- * - pierce: how many enemies a bullet passes through. 0 = stops at the first hit (default), 1 = survives
- *   one hit and dies on the second, and so on. Each target is hit at most once per bullet.
+ * - pierce (BTD meaning since 2026-11-20, user): how many enemies a bullet hits before it is used up. 1 = stops at
+ *   the first hit (default), 2 = hits two, and so on; each hit deals full damage and each target is hit at most once
+ *   per bullet. (Before 2026-11-20 it counted extra hits: old 0 = new 1; the assets were moved up by 1.)
  * - homing: when on, every bullet turns toward the target's current position from launch (curving
  *   bullets skip their settle arc and just turn in). homingStrength 0..1 scales the turn rate up to
  *   1080 degrees per second. If the target dies the bullet switches to the weapon's current target.
@@ -37,18 +38,19 @@ public class GunStats : AimedWeaponStats
     [SerializeField, Range(0f, 120f)] private float curveStartAngle = 50f;
     [SerializeField, Range(0f, 90f)] private float curveAngleStep = 25f;
     [SerializeField, Min(1f)] private float curveTurnSpeed = 240f;
-    [SerializeField, Min(0)] private int pierce;
+    [Tooltip("Enemies one bullet hits before it is used up (1 = the first enemy only).")]
+    [SerializeField, Min(1)] private int pierce = 1;
     [SerializeField] private bool homing;
     [SerializeField, Range(0f, 1f)] private float homingStrength = 0.5f;
 
     private const float MaxHomingTurnSpeed = 1080f;
 
-    public int Pierce => pierce;
+    public int Pierce => Mathf.Max(1, pierce);
 
     // Runtime changes for upgrade copies only (see WeaponStats.AddDamage).
     public void AddPierce(int amount)
     {
-        pierce = Mathf.Max(0, pierce + amount);
+        pierce = Mathf.Max(1, pierce + amount);
     }
 
     public void AddProjectiles(int amount)

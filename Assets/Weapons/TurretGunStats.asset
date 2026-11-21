@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: TurretGunStats
   m_EditorClassIdentifier: Assembly-CSharp::GunStats
   attackInterval: 0.6
-  damage: 4
+  damage: 10
   resourceDamageMultiplier: 0
   targets: 1
   range: 9
@@ -41,6 +41,6 @@ MonoBehaviour:
   curveStartAngle: 50
   curveAngleStep: 25
   curveTurnSpeed: 240
-  pierce: 0
+  pierce: 1
   homing: 0
   homingStrength: 0.5

@@ -14,3 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
   maxHealth: 30
   moveSpeed: 2
+  layers:
+  - Bare
+  - Helmet
+  - Plate
+  layerHealth: 10
+  focus: 0
+  playerAggroRadius: 2
+  hunterLingerTime: 2
+  contactDamage: 5
+  contactRange: 1.4
+  contactInterval: 1
+  baseHitDamage: 5

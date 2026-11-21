@@ -8,6 +8,8 @@
  *   runLength). It spawns `budget` enemies at `spawnRate` per second; whatever is left when the wave ends is dropped.
  *   rangedChance = share of the spawns that come for the player in the dark that are ranged hunters (the light/dark
  *   split itself stays on EnemySpawner). intensity only picks hint text; it does not change spawning.
+ *   armorWeights (2026-11-20): weights for how many armor layers a basic rat spawns with (index = extra layers;
+ *   PickArmor rolls one). Empty = all bare. bagChance: share of base-bound spawns that are bag rats.
  * - Hints: hintLeadTime seconds before a wave whose intensity differs from the current wave's, one random line from
  *   that intensity's list is shown (an empty list = no hint).
  * - WaveEnd(i) / WaveAt(time) / SpawnSeconds(i) are helpers for the run director and the inspector.
@@ -34,6 +36,10 @@ public class RunTimeline : ScriptableObject
         [Min(0.01f)] public float spawnRate = 1f;
         [Tooltip("Share of the player's dark spawns that are ranged hunters (ranged never come from the base share).")]
         [Range(0f, 1f)] public float rangedChance = 0.2f;
+        [Tooltip("Armor mix for basic rats, as weights: element 0 = bare, 1 = one armor layer (helmet), 2 = two (plate), ... Empty = all bare.")]
+        public float[] armorWeights = new float[0];
+        [Tooltip("Share of base-bound spawns that are bag rats (big, slow, spill rats when they die).")]
+        [Range(0f, 1f)] public float bagChance;
         [Tooltip("Picks the hint text only; it doesn't change spawning.")]
         public WaveIntensity intensity = WaveIntensity.Steady;
     }
@@ -83,6 +89,34 @@ public class RunTimeline : ScriptableObject
     {
         Wave wave = waves[index];
         return wave.spawnRate > 0f ? wave.budget / wave.spawnRate : float.PositiveInfinity;
+    }
+
+    /// <summary>Rolls a wave's armor mix: how many armor layers (0 = bare) one basic rat gets.</summary>
+    public static int PickArmor(Wave wave)
+    {
+        if (wave == null || wave.armorWeights == null || wave.armorWeights.Length == 0)
+        {
+            return 0;
+        }
+        float total = 0f;
+        for (int i = 0; i < wave.armorWeights.Length; i++)
+        {
+            total += Mathf.Max(0f, wave.armorWeights[i]);
+        }
+        if (total <= 0f)
+        {
+            return 0;
+        }
+        float roll = UnityEngine.Random.value * total;
+        for (int i = 0; i < wave.armorWeights.Length; i++)
+        {
+            roll -= Mathf.Max(0f, wave.armorWeights[i]);
+            if (roll < 0f)
+            {
+                return i;
+            }
+        }
+        return wave.armorWeights.Length - 1;
     }
 
     /// <summary>A random hint line for an intensity, or null if it has none.</summary>

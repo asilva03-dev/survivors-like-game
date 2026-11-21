@@ -34,6 +34,9 @@
  *   edge hands itself to BaseDive (which plays the leap into the box and deals the stats' baseHitDamage once) and
  *   leaves at once through EnterBase (event EnteredBase: no death effect, no drops, no wave refund). Without a
  *   BaseDive it bites the base as before.
+ * - Layers (2026-11-20): with EnemyStats layers, health is a stack of layers (see EnemyStats). The enemy comes out of
+ *   the pool bare; the spawner calls SetExtraLayers(n) right after Get. Layers / TopLayerName say what is left; each
+ *   hit that strips a layer fires LayerPopped(enemy, before, after) (layer visuals and pop effects listen to it).
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -97,16 +100,62 @@ public class Enemy : Damageable
     public EnemyStats Stats => stats;
     public virtual bool WantsToMove => true;
 
+    // A layer was stripped: (enemy, layers before, layers left). Fires once per hit, even when it strips several.
+    public static event System.Action<Enemy, int, int> LayerPopped;
+
+    public bool HasLayers => stats != null && stats.HasLayers;
+    /// <summary>Damage the killing hit dealt past 0 health (health isn't clamped); 0 while alive.</summary>
+    public float Overkill => Health < 0f ? -Health : 0f;
+    /// <summary>Layers left (1 = bare); 0 for enemies without layers.</summary>
+    public int Layers { get; private set; }
+    /// <summary>Name of the outermost layer left (EnemyStats.layers), "" without layers.</summary>
+    public string TopLayerName => HasLayers ? stats.LayerName(Layers - 1) : "";
+
+    /// <summary>Spawn-time armor: the bare layer plus `extra` armor layers (clamped to the stats' list), at full health.</summary>
+    public void SetExtraLayers(int extra)
+    {
+        if (!HasLayers)
+        {
+            return;
+        }
+        Layers = Mathf.Clamp(1 + extra, 1, stats.LayerCount);
+        SetMaxHealth(Layers * stats.LayerHealth);
+        RestoreFullHealth();
+    }
+
+    // Layered enemies: damage carries through the layers; LayerPopped fires when the outermost layer count drops.
+    public override void TakeDamage(float amount)
+    {
+        int before = Layers;
+        base.TakeDamage(amount);
+        if (!HasLayers || Health <= 0f)
+        {
+            return;
+        }
+        int left = Mathf.Clamp(Mathf.CeilToInt(Health / stats.LayerHealth - 0.0001f), 1, stats.LayerCount);
+        if (left < before)
+        {
+            Layers = left;
+            LayerPopped?.Invoke(this, before, left);
+        }
+    }
+
     protected virtual void Awake()
     {
         if (stats != null)
         {
-            SetMaxHealth(stats.MaxHealth);
+            SetMaxHealth(stats.HasLayers ? stats.LayerHealth : stats.MaxHealth);
         }
     }
 
     protected override void OnEnable()
     {
+        // A layered enemy comes back from the pool bare; the spawner adds armor with SetExtraLayers.
+        if (HasLayers)
+        {
+            SetMaxHealth(stats.LayerHealth);
+            Layers = 1;
+        }
         base.OnEnable();
         Active.Add(this);
         knockRemaining = 0f;

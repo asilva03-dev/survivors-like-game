@@ -41,6 +41,6 @@ MonoBehaviour:
   curveStartAngle: 50
   curveAngleStep: 25
   curveTurnSpeed: 240
-  pierce: 0
+  pierce: 1
   homing: 0
   homingStrength: 0.5
