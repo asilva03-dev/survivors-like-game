@@ -113,7 +113,7 @@ public class BurstProjectile : MonoBehaviour
             float amount = stats.DamageFor(candidate.Category);
             if (amount > 0f)
             {
-                candidate.TakeDamage(amount);
+                candidate.TakeHit(amount, stats.HitFlags);
             }
 
             onHit?.Invoke(Vector3.Lerp(from, to, t));

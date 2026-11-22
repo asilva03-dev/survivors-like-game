@@ -234,7 +234,7 @@ public class Projectile : MonoBehaviour
         float amount = stats.DamageFor(target.Category);
         if (amount > 0f)
         {
-            target.TakeDamage(amount);
+            target.TakeHit(amount, stats.HitFlags);
         }
     }
 

@@ -35,7 +35,7 @@ public class ThrowEWeapon : ThrowWeapon<ThrowEStats>
             float amount = Stats.DamageFor(candidate.Category);
             if (amount > 0f)
             {
-                candidate.TakeDamage(amount);
+                candidate.TakeHit(amount, Stats.HitFlags);
             }
         }
     }

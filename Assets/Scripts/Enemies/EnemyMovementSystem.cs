@@ -34,6 +34,13 @@
  *   walks off the ledge and falls (fallGravity) until it lands; walking up or down ramps follows the ground at once.
  *   Diagonal neighbours count as open when either straight route is. The enemy's feet (root minus
  *   Enemy.RootAboveFeet) are put on the ground.
+ * - Runners (2026-11-21, athletic rat: EnemyStats.JumpsWalls, user: "literally beeline it to the base"): no flow field
+ *   and no wall push-out; they seek straight at their target (map routes still take them around cliffs) and run over
+ *   walls and build strips alike (WallHop + RatRunCycle show the vault over each fence).
+ * - Swarms (2026-11-21, rat swarm): an enemy's EnemyStats.SpacingScale shrinks its separation radius and min spacing
+ *   (a pair uses the average of both scales), so tiny mice pack tightly. A swarm member (Enemy.Swarm) that strays past
+ *   its group's Slack from the group's Centre is pulled back toward it (the stray distance x SwarmCohesion, at most
+ *   pullLimit x its move speed), on top of its normal seek, so the pack holds together on the route.
  * - Map routes (step 5, only with a MapRoutes): an enemy going for the player, or for the base where the base grid's
  *   flow field gives no direction, walks straight while the straight line to its target crosses no cliff; otherwise it
  *   follows MapRoutes toward the next map pixel (around cliffs, up ramps). Retreating hunters still walk straight.
@@ -54,6 +61,8 @@ public class EnemyMovementSystem : MonoBehaviour
     [SerializeField, Min(0f)] private float hunterLightGap = 0.5f;
     [Tooltip("Downward acceleration of an enemy that walked off a ledge (units/s²).")]
     [SerializeField, Min(0f)] private float fallGravity = 30f;
+    [Tooltip("Swarm members: the pull back toward the pack is at most this x the member's move speed.")]
+    [SerializeField, Min(0f)] private float pullLimit = 0.8f;
 
     private readonly Dictionary<int, int> cellHead = new Dictionary<int, int>();
     private readonly List<int> neighbors = new List<int>(32);
@@ -62,6 +71,8 @@ public class EnemyMovementSystem : MonoBehaviour
     private Vector2[] goals = new Vector2[64];
     private float[] stops = new float[64];
     private bool[] followsField = new bool[64];
+    private bool[] runners = new bool[64];
+    private float[] spacingScales = new float[64];
     // 0 = no map route, 1 = route to the player, 2 = route to the base (MapRoutes).
     private byte[] routeTo = new byte[64];
     private Vector2[] faces = new Vector2[64];
@@ -105,18 +116,21 @@ public class EnemyMovementSystem : MonoBehaviour
         {
             Enemy enemy = enemies[i];
             Damageable target = enemy.Target;
+            spacingScales[i] = enemy.Stats != null ? enemy.Stats.SpacingScale : 1f;
             if (enemy.HasMoveGoal)
             {
                 goals[i] = new Vector2(enemy.MoveGoal.x, enemy.MoveGoal.z);
                 stops[i] = 0f;
                 followsField[i] = false;
+                runners[i] = false;
                 routeTo[i] = 0;
                 continue;
             }
             Vector3 goal = target != null ? target.transform.position : player.position;
             goals[i] = new Vector2(goal.x, goal.z);
             stops[i] = settings.StopDistance + (target != null ? target.TargetRadius : 0f);
-            followsField[i] = field != null && target is BaseStructure;
+            runners[i] = enemy.Stats != null && enemy.Stats.JumpsWalls;
+            followsField[i] = field != null && target is BaseStructure && !runners[i];
             routeTo[i] = (byte)(target is BaseStructure ? 2 : 1);
         }
 
@@ -137,7 +151,7 @@ public class EnemyMovementSystem : MonoBehaviour
         }
         for (int i = 0; i < count; i++)
         {
-            if (walls != null)
+            if (walls != null && !runners[i])
             {
                 moved[i] = PushOutOfWalls(walls, positions[i], moved[i]);
             }
@@ -494,6 +508,18 @@ public class EnemyMovementSystem : MonoBehaviour
                 seek = direction * speed;
             }
 
+            RatSwarms.Group swarm = enemy.Swarm;
+            if (swarm != null && !enemy.IsKnockedBack && dt > 0f)
+            {
+                Vector2 toCentre = swarm.Centre - positions[i];
+                float stray = toCentre.magnitude - swarm.Slack;
+                if (stray > 0f)
+                {
+                    float memberSpeed = enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed;
+                    seek += toCentre.normalized * Mathf.Min(stray * swarm.Cohesion, memberSpeed * pullLimit);
+                }
+            }
+
             Vector2 push = Vector2.zero;
             GatherNeighbors(i, cellSize);
 
@@ -502,14 +528,15 @@ public class EnemyMovementSystem : MonoBehaviour
                 int j = neighbors[n];
                 Vector2 offset = positions[i] - positions[j];
                 float sqr = offset.sqrMagnitude;
-                if (sqr >= sqrRadius)
+                float pairScale = (spacingScales[i] + spacingScales[j]) * 0.5f;
+                if (sqr >= sqrRadius * pairScale * pairScale)
                 {
                     continue;
                 }
 
                 float length = Mathf.Sqrt(sqr);
                 Vector2 away = length > 0.0001f ? offset / length : Fallback(i, j);
-                push += away * (1f - length / radius);
+                push += away * (1f - length / (radius * pairScale));
             }
 
             push = Vector2.ClampMagnitude(push, 1f) * settings.SeparationStrength;
@@ -536,14 +563,15 @@ public class EnemyMovementSystem : MonoBehaviour
 
                 Vector2 offset = moved[i] - moved[j];
                 float sqr = offset.sqrMagnitude;
-                if (sqr >= sqrMin)
+                float pairScale = (spacingScales[i] + spacingScales[j]) * 0.5f;
+                if (sqr >= sqrMin * pairScale * pairScale)
                 {
                     continue;
                 }
 
                 float length = Mathf.Sqrt(sqr);
                 Vector2 away = length > 0.0001f ? offset / length : Fallback(i, j);
-                Vector2 correction = away * ((minSpacing - length) * 0.5f);
+                Vector2 correction = away * ((minSpacing * pairScale - length) * 0.5f);
                 moved[i] += correction;
                 moved[j] -= correction;
             }
@@ -619,6 +647,8 @@ public class EnemyMovementSystem : MonoBehaviour
         System.Array.Resize(ref goals, size);
         System.Array.Resize(ref stops, size);
         System.Array.Resize(ref followsField, size);
+        System.Array.Resize(ref runners, size);
+        System.Array.Resize(ref spacingScales, size);
         System.Array.Resize(ref routeTo, size);
         System.Array.Resize(ref faces, size);
     }

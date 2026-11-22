@@ -35,7 +35,7 @@ MonoBehaviour:
   prewarmCount: 20
   projectileSpeed: 20
   lifetime: 2
-  muzzleOffset: 1.6800001
+  muzzleOffset: 1.34
   projectileCount: 1
   projectileSpacing: 0.3
   curveStartAngle: 50

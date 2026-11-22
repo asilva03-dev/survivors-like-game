@@ -317,7 +317,7 @@ public class MeleeWeapon : WeaponBase<MeleeStats>
 
         if (amount > 0f)
         {
-            target.TakeDamage(amount);
+            target.TakeHit(amount, Stats.HitFlags);
         }
 
         if (target.Category == TargetCategory.Resource)

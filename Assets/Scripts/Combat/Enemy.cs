@@ -37,6 +37,10 @@
  * - Layers (2026-11-20): with EnemyStats layers, health is a stack of layers (see EnemyStats). The enemy comes out of
  *   the pool bare; the spawner calls SetExtraLayers(n) right after Get. Layers / TopLayerName say what is left; each
  *   hit that strips a layer fires LayerPopped(enemy, before, after) (layer visuals and pop effects listen to it).
+ * - Properties (2026-11-21): IsShadow (per spawn, SetShadow; see ShadowSight) and, from the stats, NeedsLead (pots refuse
+ *   weapon hits without HitFlags.Lead through Damageable.BlocksHit).
+ * - Swarm (2026-11-21): the RatSwarms group this enemy belongs to (null for every other enemy; cleared on enable,
+ *   set by RatSwarms right after spawning); EnemyMovementSystem pulls members toward the group's centre.
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -104,6 +108,23 @@ public class Enemy : Damageable
     public static event System.Action<Enemy, int, int> LayerPopped;
 
     public bool HasLayers => stats != null && stats.HasLayers;
+    /// <summary>Shadow rat (per spawn): towers and auto-aim can only target it with shadow detection or in a RevealLight.</summary>
+    public bool IsShadow { get; private set; }
+    /// <summary>The swarm this enemy belongs to (RatSwarms), or null.</summary>
+    public RatSwarms.Group Swarm { get; set; }
+
+    /// <summary>Spawn-time: makes this enemy a shadow (reset to false whenever it comes out of the pool).</summary>
+    public void SetShadow(bool shadow)
+    {
+        IsShadow = shadow;
+    }
+
+    // Pots (stats NeedsLead) refuse hits without the Lead property.
+    protected override bool BlocksHit(HitFlags flags)
+    {
+        return stats != null && stats.NeedsLead && (flags & HitFlags.Lead) == 0;
+    }
+
     /// <summary>Damage the killing hit dealt past 0 health (health isn't clamped); 0 while alive.</summary>
     public float Overkill => Health < 0f ? -Health : 0f;
     /// <summary>Layers left (1 = bare); 0 for enemies without layers.</summary>
@@ -158,6 +179,8 @@ public class Enemy : Damageable
         }
         base.OnEnable();
         Active.Add(this);
+        IsShadow = false;
+        Swarm = null;
         knockRemaining = 0f;
         FallSpeed = 0f;
         contactCooldown = 0f;

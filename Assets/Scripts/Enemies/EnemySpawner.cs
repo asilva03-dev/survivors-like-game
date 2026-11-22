@@ -32,9 +32,17 @@
  * - SpawnsEnabled pauses/resumes spawning (TrySpawn refuses while paused; the run clock keeps going) and raises
  *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
  * - Spill (2026-11-20, bag rat): an enemy whose EnemyStats.SpillCount > 0 spills that many basic rats from the normal
- *   pool where it died (same assignment, the stats' armor layers, pushed out evenly by Enemy.Knockback over spillSpread),
+ *   pool where it died (same assignment and shadow property, the stats' armor layers, pushed out evenly by Enemy.Knockback over spillSpread),
  *   each then takes the killing hit's leftover damage (Enemy.Overkill, if spillCarriesOverkill), and a chip burst plays
  *   (ArmorPopEffect, spillBurstColor). Spilled rats use no wave budget. A bag rat that dives into the base spills nothing.
+ * - Pot rats (2026-11-21): potEnemyPrefab's pool; for now only SpawnForBase (debug keys) spawns them (the spawn director
+ *   will put them in waves). When one dies its stats' spill releases the rats under the pot (see Spill).
+ * - Athletic rats (2026-11-21): athleticEnemyPrefab's pool; base-bound only, spawned by SpawnForBase (F6) until the spawn
+ *   director (which will keep them out of the player's dark share).
+ * - Swarm mice (2026-11-21, rat swarm): swarmEnemyPrefab's pool. SpawnForBase(Swarm) spawns a whole swarm through
+ *   RatSwarms.Spawn, which takes each mouse from here with SpawnSwarmMouse (also its refills). Base-bound only for now.
+ * - SpawnForBase(kind, armorLayers, shadow) (2026-11-21): one base-bound enemy at a base-share spot for debug keys and
+ *   tests (DebugSpawnKeys); no budget, ignores the share and the spawn pause.
  * - BaseAliveCount / PlayerAliveCount: alive enemies by assignment (debug line).
  * - The player is found by the "Player" tag; the camera is Camera.main.
  */
@@ -56,6 +64,15 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("Bag rat (2026-11-20): base-bound only, a wave's bagChance of base spawns. Empty = none.")]
     [SerializeField] private Enemy bagEnemyPrefab;
     [SerializeField, Min(0)] private int bagPrewarmCount = 2;
+    [Tooltip("Pot rat (2026-11-21): a pot carried by rats; only lead hits break it. Spawned by SpawnForBase (debug) until the spawn director.")]
+    [SerializeField] private Enemy potEnemyPrefab;
+    [SerializeField, Min(0)] private int potPrewarmCount = 2;
+    [Tooltip("Athletic rat (2026-11-21): fast, jumps walls, base-bound only. Spawned by SpawnForBase (debug) until the spawn director.")]
+    [SerializeField] private Enemy athleticEnemyPrefab;
+    [SerializeField, Min(0)] private int athleticPrewarmCount = 4;
+    [Tooltip("Swarm mouse (2026-11-21): tiny mice spawned as packs by RatSwarms. Spawned by SpawnForBase (debug) until the spawn director.")]
+    [SerializeField] private Enemy swarmEnemyPrefab;
+    [SerializeField, Min(0)] private int swarmPrewarmCount = 24;
 
     [Header("Split")]
     [Tooltip("Share of spawns that come for the player the moment they leave the light.")]
@@ -90,6 +107,9 @@ public class EnemySpawner : MonoBehaviour
     private ComponentPool<Enemy> pool;
     private ComponentPool<Enemy> rangedPool;
     private ComponentPool<Enemy> bagPool;
+    private ComponentPool<Enemy> potPool;
+    private ComponentPool<Enemy> athleticPool;
+    private ComponentPool<Enemy> swarmPool;
     private Transform player;
     private Rigidbody playerBody;
     private Camera cam;
@@ -149,6 +169,18 @@ public class EnemySpawner : MonoBehaviour
         if (bagEnemyPrefab != null)
         {
             bagPool = new ComponentPool<Enemy>(bagEnemyPrefab, poolRoot, bagPrewarmCount);
+        }
+        if (potEnemyPrefab != null)
+        {
+            potPool = new ComponentPool<Enemy>(potEnemyPrefab, poolRoot, potPrewarmCount);
+        }
+        if (athleticEnemyPrefab != null)
+        {
+            athleticPool = new ComponentPool<Enemy>(athleticEnemyPrefab, poolRoot, athleticPrewarmCount);
+        }
+        if (swarmEnemyPrefab != null)
+        {
+            swarmPool = new ComponentPool<Enemy>(swarmEnemyPrefab, poolRoot, swarmPrewarmCount);
         }
     }
 
@@ -250,6 +282,77 @@ public class EnemySpawner : MonoBehaviour
         return true;
     }
 
+    public enum Kind { Basic, Ranged, Bag, Pot, Athletic, Swarm }
+
+    /// <summary>
+    /// Debug / tests (2026-11-21): spawns one enemy of `kind` heading for the base at a normal base-share spot (off screen
+    /// just outside the light), with armorLayers and the shadow property. Ignores the player share and SpawnsEnabled;
+    /// uses no wave budget. Null when no spot was found or that kind has no prefab.
+    /// </summary>
+    public Enemy SpawnForBase(Kind kind, int armorLayers, bool shadow)
+    {
+        if (kind == Kind.Swarm)
+        {
+            return SpawnSwarmForBase(shadow);
+        }
+        ComponentPool<Enemy> source = kind == Kind.Ranged ? rangedPool : kind == Kind.Bag ? bagPool : kind == Kind.Pot ? potPool
+            : kind == Kind.Athletic ? athleticPool : pool;
+        if (source == null || player == null)
+        {
+            return null;
+        }
+        if (cam == null)
+        {
+            cam = Camera.main;
+        }
+        Vector3 point;
+        if (!TryFindBaseSpawnPoint(out point))
+        {
+            return null;
+        }
+        Enemy enemy = source.Get(point, Quaternion.identity);
+        enemy.Assignment = EnemyAssignment.Base;
+        enemy.SetExtraLayers(armorLayers);
+        enemy.SetShadow(shadow);
+        alive.Add(enemy, source);
+        return enemy;
+    }
+
+    // A whole swarm (RatSwarms) at a base-share spot.
+    private Enemy SpawnSwarmForBase(bool shadow)
+    {
+        RatSwarms swarms = RatSwarms.Instance;
+        if (swarms == null || swarmPool == null || player == null)
+        {
+            return null;
+        }
+        if (cam == null)
+        {
+            cam = Camera.main;
+        }
+        Vector3 point;
+        if (!TryFindBaseSpawnPoint(out point))
+        {
+            return null;
+        }
+        return swarms.Spawn(point, EnemyAssignment.Base, shadow);
+    }
+
+    /// <summary>RatSwarms: one swarm mouse from its pool at `point` (feet put on the ground). Null without a swarm prefab.</summary>
+    public Enemy SpawnSwarmMouse(Vector3 point, EnemyAssignment assignment, bool shadow)
+    {
+        if (swarmPool == null)
+        {
+            return null;
+        }
+        point = OnGround(point);
+        Enemy mouse = swarmPool.Get(point, Quaternion.identity);
+        mouse.Assignment = assignment;
+        mouse.SetShadow(shadow);
+        alive.Add(mouse, swarmPool);
+        return mouse;
+    }
+
     private void HandleDied(Damageable target)
     {
         Enemy enemy = target as Enemy;
@@ -272,6 +375,7 @@ public class EnemySpawner : MonoBehaviour
             Enemy child = pool.Get(point, Quaternion.identity);
             child.Assignment = parent.Assignment;
             child.SetExtraLayers(stats.SpillArmorLayers);
+            child.SetShadow(parent.IsShadow);
             alive.Add(child, pool);
             float angle = (startAngle + i * 360f / stats.SpillCount + Random.Range(-15f, 15f)) * Mathf.Deg2Rad;
             child.Knockback(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)), stats.SpillSpread, 0.35f);

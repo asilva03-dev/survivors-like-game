@@ -105,7 +105,7 @@ public class LingerPuddle : MonoBehaviour
             float amount = stats.DamageFor(candidate.Category);
             if (amount > 0f)
             {
-                candidate.TakeDamage(amount);
+                candidate.TakeHit(amount, stats.HitFlags);
             }
         }
     }

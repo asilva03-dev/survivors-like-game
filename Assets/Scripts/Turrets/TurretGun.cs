@@ -9,6 +9,8 @@
  * - Range, damage, fire rate, turn speed and the bullet come from its own GunStats asset (targets Enemy only, ring
  *   radius 0, ring/claims off). The owner (WeaponBase.owner) is the turret's aim point; the gun object sits on it
  *   and yaws toward the target, turning the turret body with it.
+ * - Runners (athletic rats, 2026-11-21) beeline to the base, so they are ranked by their straight distance to it.
+ * - Shadow rats (2026-11-21) are skipped unless its stats detect shadows or the rat stands in a RevealLight.
  * - With no target it scans left and right around the turret's rest direction (toward the nearest path cell); the
  *   sweep size and speed are on the TurretDefinition. It turns to a new target at the stats' turnSpeed.
  */
@@ -76,7 +78,7 @@ public class TurretGun : GunWeapon
         for (int i = 0; i < Damageable.All.Count; i++)
         {
             Damageable candidate = Damageable.All[i];
-            if (!CanTarget(candidate.Category))
+            if (!CanTarget(candidate.Category) || !ShadowSight.CanTarget(candidate, Stats.DetectsShadow))
             {
                 continue;
             }
@@ -89,7 +91,9 @@ public class TurretGun : GunWeapon
                 continue;
             }
 
-            float score = PathDistance(position, field, grid, basePoint);
+            Enemy enemy = candidate as Enemy;
+            bool jumper = enemy != null && enemy.Stats != null && enemy.Stats.JumpsWalls;
+            float score = PathDistance(position, field, grid, basePoint, jumper);
             if (score < bestScore)
             {
                 bestScore = score;
@@ -100,11 +104,11 @@ public class TurretGun : GunWeapon
         return best;
     }
 
-    private static float PathDistance(Vector3 position, FlowField field, BuildGrid grid, Vector3 basePoint)
+    private static float PathDistance(Vector3 position, FlowField field, BuildGrid grid, Vector3 basePoint, bool jumper)
     {
         if (field != null && grid != null)
         {
-            int distance = field.GetDistance(grid.WorldToCell(position));
+            int distance = jumper ? FlowField.Unreachable : field.GetDistance(grid.WorldToCell(position));
             if (distance != FlowField.Unreachable)
             {
                 return distance;

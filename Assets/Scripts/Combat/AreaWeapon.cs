@@ -108,7 +108,7 @@ public class AreaWeapon : WeaponBase<AreaStats>
             float amount = Stats.DamageFor(hits[i].Category);
             if (amount > 0f)
             {
-                hits[i].TakeDamage(amount);
+                hits[i].TakeHit(amount, Stats.HitFlags);
             }
         }
 

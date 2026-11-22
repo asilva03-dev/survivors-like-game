@@ -694,6 +694,12 @@ MonoBehaviour:
   prewarmCount: 120
   bagEnemyPrefab: {fileID: 5482191685582331710, guid: a054c4c56ed15b0409d0f5b4e789caa6, type: 3}
   bagPrewarmCount: 2
+  potEnemyPrefab: {fileID: 5482191685582331710, guid: 4fd4a5ae16fc8fa49b97d424b8d55dc1, type: 3}
+  potPrewarmCount: 2
+  athleticEnemyPrefab: {fileID: 5482191685582331710, guid: aa5c9055dc8b06e49a3579d3b148e7e9, type: 3}
+  athleticPrewarmCount: 4
+  swarmEnemyPrefab: {fileID: 5482191685582331710, guid: c1cd281d31c223641896027f84a774bb, type: 3}
+  swarmPrewarmCount: 24
   playerShareMin: 0.3
   playerShareMax: 0.7
   playerShareRampTime: 20
@@ -2051,6 +2057,75 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 711044057}
   m_CullTransparentMesh: 1
+--- !u!1 &741080436
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 741080438}
+  - component: {fileID: 741080437}
+  m_Layer: 0
+  m_Name: DebugSpawnKeys
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &741080437
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 741080436}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7876f9473f6496b47b04c6c60ae0ddd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugSpawnKeys
+  spawner: {fileID: 147156299}
+  shadowModifier: 51
+  enableInBuilds: 1
+  entries:
+  - key: 94
+    kind: 0
+    armorLayers: 0
+  - key: 95
+    kind: 0
+    armorLayers: 1
+  - key: 96
+    kind: 0
+    armorLayers: 2
+  - key: 97
+    kind: 2
+    armorLayers: 0
+  - key: 98
+    kind: 3
+    armorLayers: 0
+  - key: 99
+    kind: 4
+    armorLayers: 0
+  - key: 100
+    kind: 5
+    armorLayers: 0
+--- !u!4 &741080438
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 741080436}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &764099523
 GameObject:
   m_ObjectHideFlags: 0
@@ -3154,6 +3229,62 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!1 &1066408246
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1066408248}
+  - component: {fileID: 1066408247}
+  m_Layer: 0
+  m_Name: RatSwarms
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1066408247
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1066408246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d78f6b99f983abf4c93c21be04125e66, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RatSwarms
+  spawner: {fileID: 147156299}
+  settings: {fileID: 11400000, guid: 4b2ccecef30a342409cead1c89f4d273, type: 2}
+  swarmStats: {fileID: 11400000, guid: 5b7eedf743db3df41b4c1dbb6513f762, type: 2}
+  puffMaterial: {fileID: 2100000, guid: 38bffc6e610dc2241b86ccc416dc8940, type: 2}
+  dustEvery: 0.4
+  refillBurst: 5
+  lifetime: {x: 0.35, y: 0.6}
+  startSize: {x: 0.12, y: 0.22}
+  backSpeed: {x: 0.4, y: 1}
+  upSpeed: {x: 0.3, y: 0.8}
+  sideSpread: 0.4
+  color: {r: 0.86, g: 0.82, b: 0.74, a: 1}
+--- !u!4 &1066408248
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1066408246}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1163108116
 GameObject:
   m_ObjectHideFlags: 0
@@ -3418,6 +3549,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArmorPopEffect
   burstPrefab: {fileID: 1367586082328074417, guid: 6518c4c2563014c448f75254b28d4470, type: 3}
   prewarmCount: 12
+  blockedHitColor: {r: 0.85, g: 0.87, b: 0.9, a: 1}
+  blockedHitHeight: -0.4
 --- !u!4 &1383610841
 Transform:
   m_ObjectHideFlags: 0
@@ -5152,6 +5285,7 @@ MonoBehaviour:
   wallRadius: 0.4
   hunterLightGap: 0.5
   fallGravity: 30
+  pullLimit: 0.8
 --- !u!4 &2125069817
 Transform:
   m_ObjectHideFlags: 0
@@ -5198,8 +5332,10 @@ SceneRoots:
   - {fileID: 918940008}
   - {fileID: 173867425}
   - {fileID: 1163108118}
+  - {fileID: 741080438}
   - {fileID: 1575583243}
   - {fileID: 1514758004}
   - {fileID: 1876739705}
   - {fileID: 819754572}
   - {fileID: 384386730}
+  - {fileID: 1066408248}

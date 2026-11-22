@@ -6,7 +6,7 @@
  * - maxHealth is applied to the enemy's Damageable health when it is enabled (so it overrides the prefab's
  *   own Max Health), and moveSpeed (units per second toward the player) replaces EnemySettings.MoveSpeed
  *   for that enemy. Spacing, stop distance and turn speed stay shared in EnemySettings.
- * - contactDamage is dealt to the enemy's current target (the player or the base, whichever is closer) while
+ * - contactDamage is dealt to the enemy's current target (the player or the base, by the light rule; see Enemy) while
  *   the enemy is within contactRange of it (flat distance between centres, plus the target's TargetRadius for
  *   big things like the base). Each enemy waits contactInterval seconds after a hit before it can hit again
  *   (the player's invulnerability frames still apply on top); 0 damage disables it. Every Enemy does this, so
@@ -19,6 +19,13 @@
  *   next entry an armor layer on top (rat: Bare, Helmet, Plate). The spawner picks how many armor layers each spawn
  *   gets (Enemy.SetExtraLayers); damage strips layers from the top and carries through them (20 damage = 2 layers),
  *   and the enemy dies when the bare layer is emptied. Empty list = plain health (ranged rats).
+ * - needsLead (2026-11-21, pots): only weapon hits with the Lead property hurt it (see Damageable.TakeHit).
+ * - jumpsWalls (2026-11-21, athletic rat): a runner: it beelines straight at its target, ignoring the flow field and the
+ *   base walls (EnemyMovementSystem), vaulting each fence on the way (WallHop + RatRunCycle).
+ * - Swarm (2026-11-21, rat swarm): spacingScale shrinks this type's share of EnemySettings' separation and min spacing
+ *   (tiny mice pack tightly; a pair uses the average of both scales). swarmSize > 0 makes the type a swarm member:
+ *   RatSwarms spawns swarmSize of them as one pack that holds together (swarmCohesion, see EnemyMovementSystem) and
+ *   replaces each killed member swarmRefillDelay seconds later from a reserve of swarmReserve, while one is still alive.
  * - Spill on death (2026-11-20, bag rat): spillCount basic rats with spillArmorLayers armor pop out where it died
  *   (EnemySpawner), pushed out by spillSpread, each taking the killing hit's leftover damage (spillCarriesOverkill),
  *   with a chip burst in spillBurstColor. 0 = nothing spills.
@@ -61,6 +68,24 @@ public class EnemyStats : ScriptableObject
     [Tooltip("Damage dealt to the base when this enemy dives into the box (once; the enemy is gone after). Placeholder.")]
     [SerializeField, Min(0f)] private float baseHitDamage = 5f;
 
+    [Header("Properties")]
+    [Tooltip("Only hits with the Lead property damage it (pots). Others are refused (Damageable.HitBlocked).")]
+    [SerializeField] private bool needsLead;
+    [Tooltip("Runner: beelines straight to the base, vaulting the walls in the way (athletic rat).")]
+    [SerializeField] private bool jumpsWalls;
+
+    [Header("Swarm (rat swarm)")]
+    [Tooltip("This type's share of the crowd spacing (EnemySettings separation radius / min spacing). 1 = normal rats, small = packs tightly.")]
+    [SerializeField, Range(0.1f, 1f)] private float spacingScale = 1f;
+    [Tooltip("Members spawned together as one swarm (0 = not a swarm type).")]
+    [SerializeField, Min(0)] private int swarmSize;
+    [Tooltip("Killed members replaced from this reserve, one each, while at least one member is alive.")]
+    [SerializeField, Min(0)] private int swarmReserve;
+    [Tooltip("Seconds (random in this range) before a killed member is replaced.")]
+    [SerializeField] private Vector2 swarmRefillDelay = new Vector2(3f, 4f);
+    [Tooltip("How strongly a member is pulled back toward the pack's centre (per unit it strays past the pack's size).")]
+    [SerializeField, Min(0f)] private float swarmCohesion = 3f;
+
     [Header("Spill on death (bag rat)")]
     [Tooltip("Basic rats that spill out when this enemy dies (0 = none).")]
     [SerializeField, Min(0)] private int spillCount;
@@ -87,6 +112,13 @@ public class EnemyStats : ScriptableObject
     public float ContactRange => contactRange;
     public float ContactInterval => contactInterval;
     public float BaseHitDamage => baseHitDamage;
+    public bool NeedsLead => needsLead;
+    public bool JumpsWalls => jumpsWalls;
+    public float SpacingScale => spacingScale;
+    public int SwarmSize => swarmSize;
+    public int SwarmReserve => swarmReserve;
+    public Vector2 SwarmRefillDelay => swarmRefillDelay;
+    public float SwarmCohesion => swarmCohesion;
     public int SpillCount => spillCount;
     public int SpillArmorLayers => spillArmorLayers;
     public float SpillSpread => spillSpread;

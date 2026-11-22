@@ -14,6 +14,8 @@
  *   buffs scale resource damage consistently. Structures and the player are never damaged by weapons.
  *   DamageFor(category) returns 0 for any category not in targets.
  * - targets is which categories the weapon will aim at and hurt (enemies and resources by default).
+ * - lead (2026-11-21): the Lead hit property; weapons hit through Damageable.TakeHit(amount, HitFlags), and pots refuse
+ *   hits without it. SetLead for upgrade copies.
  * - Edits to an asset apply live to every weapon using it, including during Play mode.
  */
 
@@ -25,6 +27,8 @@ public abstract class WeaponStats : ScriptableObject
     [SerializeField] private float damage = 10f;
     [SerializeField, Min(0f)] private float resourceDamageMultiplier = 1f;
     [SerializeField] private TargetMask targets = TargetMask.Enemy | TargetMask.Resource;
+    [Tooltip("Lead property: its hits can damage enemies that need lead (pots).")]
+    [SerializeField] private bool lead;
 
     public abstract float Range { get; }
     public float AttackInterval => attackInterval;
@@ -38,6 +42,15 @@ public abstract class WeaponStats : ScriptableObject
         return Mathf.Ceil(baseDamage * resourceDamageMultiplier - 0.0001f);
     }
     public TargetMask Targets => targets;
+    public bool Lead => lead;
+    /// <summary>The properties this weapon's hits carry (Damageable.TakeHit).</summary>
+    public HitFlags HitFlags => lead ? HitFlags.Lead : HitFlags.None;
+
+    // Runtime change for upgrade copies only.
+    public void SetLead(bool value)
+    {
+        lead = value;
+    }
 
     // Runtime changes, for upgrade copies only (turret upgrades call these on an Instantiate'd copy, never the asset).
     public void AddDamage(float amount)

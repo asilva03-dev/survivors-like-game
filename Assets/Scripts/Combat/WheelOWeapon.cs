@@ -130,7 +130,7 @@ public class WheelOWeapon : WeaponBase<WheelOStats>
             if (amount > 0f)
             {
                 orb.lastHit[candidate] = now;
-                candidate.TakeDamage(amount);
+                candidate.TakeHit(amount, Stats.HitFlags);
             }
         }
 

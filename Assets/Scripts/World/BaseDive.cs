@@ -14,6 +14,7 @@
  *   together add up), and a pooled cardboard-scrap DebrisBurst (scrapsPrefab) pops out of the top.
  * - Copies come from one ComponentPool per enemy type (EnemyStats), the rat's prewarmed from ratPrefab; bursts from
  *   their own pool. Never Instantiate/Destroy per dive (a pool only grows when empty).
+ * - A shadow rat keeps its fur and veil in the dive (ShadowLook.ApplyTo).
  * - A rat with RatArmor keeps its armor in the dive (RatArmor.ApplyTo sets the copy's pieces and body mesh).
  * - Without this object in the scene, enemies bite the base as before.
  */
@@ -112,6 +113,11 @@ public class BaseDive : MonoBehaviour
         if (armor != null)
         {
             armor.ApplyTo(dive.diver);
+        }
+        ShadowLook shadowLook = enemy.GetComponent<ShadowLook>();
+        if (shadowLook != null)
+        {
+            shadowLook.ApplyTo(dive.diver);
         }
         dive.scale = visual.lossyScale;
         dive.diver.localScale = dive.scale;

@@ -31,6 +31,8 @@
  * - claimsTargets: on (default, guns), the weapon takes part in target claiming: it avoids enemies other claiming
  *   weapons already took and others avoid its enemy. Off (the throwables), it ignores claims entirely and
  *   neither makes nor respects them, so it always goes for its best target.
+ * - detectsShadow (2026-11-21): the "shadow" property; without it the weapon can't target shadow rats unless they
+ *   stand in a RevealLight (the base light doesn't count). See ShadowSight. SetDetectsShadow for upgrade copies.
  * - displacedTurnSpeed is the slower degrees per second used while sliding to or from a free spot
  *   (lower = smoother, less twitchy).
  */
@@ -54,6 +56,16 @@ public abstract class AimedWeaponStats : WeaponStats
     [SerializeField] private bool claimsTargets = true;
     [SerializeField] private bool preferClusters;
     [SerializeField, Min(0.1f)] private float clusterRadius = 2.5f;
+    [Tooltip("Shadow property: can target shadow rats anywhere (without it, only those inside a RevealLight).")]
+    [SerializeField] private bool detectsShadow;
+
+    public bool DetectsShadow => detectsShadow;
+
+    // Runtime change for upgrade copies only.
+    public void SetDetectsShadow(bool value)
+    {
+        detectsShadow = value;
+    }
 
     public bool AvoidCloseRange => avoidCloseRange;
     public bool PreferFarTargets => preferFarTargets;

@@ -49,13 +49,14 @@ public abstract class AimedWeapon<TStats> : WeaponBase<TStats>, IAimedWeapon whe
     // Target pick when there is no WeaponLoadout (e.g. turrets): nearest in range unless a subclass overrides it.
     protected virtual Damageable FindOwnTarget()
     {
-        return Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets);
+        return Damageable.FindNearest(Owner.position, Stats.Range, Stats.Targets, Stats.DetectsShadow);
     }
     public float RingRadius => Stats.RingRadius;
     public float SeparationDistance => Stats.SeparationDistance;
 
     public bool FocusWeakestResource => Stats.FocusWeakestResource;
     public bool AvoidCloseRange => Stats.AvoidCloseRange;
+    public bool DetectsShadow => Stats.DetectsShadow;
     public bool PreferFarTargets => Stats.PreferFarTargets;
     public bool StickyTargets => Stats.StickyTargets;
     public bool UseRing => Stats.UseRing;

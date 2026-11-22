@@ -16,6 +16,12 @@
  *   pistol too.
  * - Bag rat (2026-11-20, enemy layers step 3): Tools > Models > Build Bag Rat writes BagRatBody.asset (an upright,
  *   round-bellied rat, 1.3x the ranged rat) and BagRatSack.asset (a burlap sack resting over its right shoulder).
+ * - Pot rat (2026-11-21, new rats): Tools > Models > Build Pot Rat writes PotCrew.asset (feet, tails and a nose of the
+ *   3 rats under the pot) and PotShell.asset (the dented tin cooking pot, upside down).
+ * - Athletic rat (2026-11-21, new rats step 4): Tools > Models > Build Athletic Rat writes the runner's 7 part meshes
+ *   (Models/AthleticRat_<part>.asset: torso, arms, thighs, shins) for the jointed rig RatRunCycle animates.
+ * - Swarm mouse (2026-11-21, new rats step 5): Tools > Models > Build Swarm Mouse writes SwarmMouse.asset, a tiny simple
+ *   baby mouse (round body, snout, round pink ears, eye dots, short tail; 204 tris).
  * - Rat armor (2026-11-20, enemy layers): Tools > Models > Build Rat Armor writes RatHelmet.asset (red bottle cap),
  *   RatPlate.asset (iron lames on the back) and RatLowPolyNoEars.asset (the basic rat without ears, worn under the cap).
  */
@@ -35,7 +41,7 @@ public static class RatModelBuilder
 
     private static readonly List<Vector3> Vertices = new List<Vector3>();
     private static readonly List<Vector3> Normals = new List<Vector3>();
-    private static readonly List<int>[] Triangles = { new List<int>(), new List<int>(), new List<int>() };
+    private static readonly List<int>[] Triangles = { new List<int>(), new List<int>(), new List<int>(), new List<int>(), new List<int>() };
 
     [MenuItem("Tools/Models/Build Low-Poly Rat")]
     public static void Build()
@@ -88,11 +94,17 @@ public static class RatModelBuilder
 
     private static Mesh Finish(string name)
     {
+        return Finish(name, 3);
+    }
+
+    // `submeshes` = how many of the material lists to use (3 for every model; 5 for the athletic rat's band colours).
+    private static Mesh Finish(string name, int submeshes)
+    {
         Mesh mesh = new Mesh { name = name };
         mesh.SetVertices(Vertices);
         mesh.SetNormals(Normals);
-        mesh.subMeshCount = 3;
-        for (int i = 0; i < 3; i++)
+        mesh.subMeshCount = submeshes;
+        for (int i = 0; i < submeshes; i++)
         {
             mesh.SetTriangles(Triangles[i], i);
         }
@@ -399,6 +411,314 @@ public static class RatModelBuilder
             Vector3 bottom = centre + new Vector3(0f, t[i] * radii.y, 0f);
             Frustum(material, bottom, Quaternion.identity, new Vector2(radii.x * k0, radii.z * k0), new Vector2(radii.x * k1, radii.z * k1), (t[i + 1] - t[i]) * radii.y, sides);
         }
+    }
+
+    // ---- Pot rat (2026-11-21, new rats step 3; user's pick: the dented tin cooking pot). An upside-down pot carried by
+    // the rats underneath (3 of them): pink feet under the rim, tails out the back, a nose peeking out the front. Crew
+    // mesh = rat submeshes (fur, pink, dark); shell mesh = its own (0 tin, 1 light tin: rim and dents, 2 dark: handle).
+    // Tools > Models > Build Pot Rat writes Models/PotCrew.asset and Models/PotShell.asset.
+    public const string PotCrewPath = "Assets/Models/PotCrew.asset";
+    public const string PotShellPath = "Assets/Models/PotShell.asset";
+
+    [MenuItem("Tools/Models/Build Pot Rat")]
+    public static void BuildPotRat()
+    {
+        Save(BuildPotCrew(), PotCrewPath);
+        Save(BuildPotShell(), PotShellPath);
+    }
+
+    public static Mesh BuildPotCrew()
+    {
+        Begin();
+        // Feet: three pairs under the rim.
+        for (int i = 0; i < 6; i++)
+        {
+            float a = (i * 60f + 30f) * Mathf.Deg2Rad;
+            Vector3 p = new Vector3(Mathf.Sin(a) * 0.48f, 0.03f, Mathf.Cos(a) * 0.48f);
+            Box(Pink, p, new Vector3(0.11f, 0.06f, 0.16f), Quaternion.Euler(0f, a * Mathf.Rad2Deg, 0f));
+            Box(Body, p + new Vector3(0f, 0.08f, 0f) - p.normalized * 0.04f, new Vector3(0.10f, 0.10f, 0.12f), Quaternion.Euler(0f, a * Mathf.Rad2Deg, 0f));
+        }
+        // Nose and whiskers peeking out at the front.
+        Hex(Body, 0.42f, new Vector3(0.10f, 0.03f, 0.17f), 0.62f, new Vector3(0.05f, 0.05f, 0.13f));
+        Box(Pink, new Vector3(0f, 0.09f, 0.64f), new Vector3(0.07f, 0.06f, 0.05f), Quaternion.identity);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Box(Dark, new Vector3(side * 0.05f, 0.14f, 0.50f), new Vector3(0.04f, 0.04f, 0.04f), Quaternion.identity);
+            Quaternion fan = Quaternion.Euler(0f, side * 70f, 0f);
+            Box(Dark, new Vector3(side * 0.04f, 0.09f, 0.60f) + fan * new Vector3(0f, 0f, 0.11f), new Vector3(0.01f, 0.01f, 0.22f), fan);
+        }
+        // Three tails out of the back, curling along the ground.
+        for (int t = 0; t < 3; t++)
+        {
+            Vector3 start = new Vector3((t - 1) * 0.20f, 0.06f, -0.50f);
+            Vector3 dir = Quaternion.Euler(0f, (t - 1) * 25f, 0f) * Vector3.back;
+            float thick = 0.06f;
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 next = start + dir * 0.17f;
+                next.y = 0.03f;
+                Segment(Pink, start, next, thick, thick * 0.75f);
+                start = next;
+                thick *= 0.75f;
+                dir = Quaternion.Euler(0f, (t - 1) * 14f + 10f, 0f) * dir;
+            }
+        }
+        return Finish("PotCrew");
+    }
+
+    public static Mesh BuildPotShell()
+    {
+        Begin();
+        float y0 = 0.10f;
+        // Dented tin cooking pot: straight sides, rolled rim, a long handle off the back, two dents.
+        Frustum(Pink, new Vector3(0f, y0, 0f), Quaternion.identity, new Vector2(0.60f, 0.60f), new Vector2(0.60f, 0.60f), 0.05f, 12);
+        Frustum(Body, new Vector3(0f, y0 + 0.05f, 0f), Quaternion.identity, new Vector2(0.57f, 0.57f), new Vector2(0.55f, 0.55f), 0.44f, 12);
+        Frustum(Body, new Vector3(0f, y0 + 0.49f, 0f), Quaternion.identity, new Vector2(0.55f, 0.55f), new Vector2(0.48f, 0.48f), 0.05f, 12);
+        Segment(Dark, new Vector3(0f, y0 + 0.30f, -0.55f), new Vector3(0f, y0 + 0.24f, -1.05f), 0.07f, 0.06f);
+        Box(Pink, new Vector3(0.36f, y0 + 0.28f, 0.42f), new Vector3(0.14f, 0.12f, 0.03f), Quaternion.Euler(0f, 40f, 0f));
+        Box(Pink, new Vector3(-0.48f, y0 + 0.36f, -0.10f), new Vector3(0.03f, 0.10f, 0.14f), Quaternion.Euler(0f, -10f, 0f));
+        return Finish("PotShell");
+    }
+
+    // ---- Shadow veil (2026-11-21, shadow rat): a smooth unit sphere (radius 0.5, smooth normals) that the shadow rats
+    // wear scaled around their body with the Custom/ShadowVeil material. Tools > Models > Build Shadow Veil.
+    public const string VeilPath = "Assets/Models/ShadowVeil.asset";
+
+    [MenuItem("Tools/Models/Build Shadow Veil")]
+    public static void BuildVeil()
+    {
+        Save(BuildVeilMesh(), VeilPath);
+    }
+
+    public static Mesh BuildVeilMesh()
+    {
+        const int rings = 10;
+        const int segments = 16;
+        List<Vector3> verts = new List<Vector3>();
+        List<Vector3> normals = new List<Vector3>();
+        List<int> tris = new List<int>();
+        for (int r = 0; r <= rings; r++)
+        {
+            float lat = Mathf.PI * r / rings;
+            for (int s = 0; s <= segments; s++)
+            {
+                float lon = 2f * Mathf.PI * s / segments;
+                Vector3 n = new Vector3(Mathf.Sin(lat) * Mathf.Cos(lon), Mathf.Cos(lat), Mathf.Sin(lat) * Mathf.Sin(lon));
+                verts.Add(n * 0.5f);
+                normals.Add(n);
+            }
+        }
+        for (int r = 0; r < rings; r++)
+        {
+            for (int s = 0; s < segments; s++)
+            {
+                int a = r * (segments + 1) + s;
+                int b = a + segments + 1;
+                tris.Add(a); tris.Add(a + 1); tris.Add(b);
+                tris.Add(b); tris.Add(a + 1); tris.Add(b + 1);
+            }
+        }
+        Mesh mesh = new Mesh { name = "ShadowVeil" };
+        mesh.SetVertices(verts);
+        mesh.SetNormals(normals);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    // ---- Athletic rat (2026-11-21, new rats step 4; user's pick: option B, the upright runner, with a real run cycle so
+    // it reads as "he's sprinting for the base"). Built as separate parts so Enemies/RatRunCycle can swing them:
+    // Torso (body, head, laid-back ears, headband, tail), ArmL/ArmR (bent at the elbow, paw, wristband), ThighL/ThighR and
+    // ShinL/ShinR (shin + foot). Rest pose = standing straight; RatRunCycle leans, bounces and swings the parts.
+    // Every part uses the same 5 materials: 0 fur, 1 pink, 2 dark (the rat's), 3 band (white), 4 band stripe (red).
+    // Each part mesh is in its joint's space (vertex = rat position - joint) and scaled by RunnerScale (small rat).
+    public const float RunnerScale = 0.6f;
+    private const int Band = 3;
+    private const int Stripe = 4;
+    public static readonly string[] RunnerParts = { "Torso", "ArmL", "ArmR", "ThighL", "ThighR", "ShinL", "ShinR" };
+
+    // Joint of each part in rat units (feet y 0, nose +Z), before RunnerScale. The hips joint = the torso's.
+    public static Vector3 RunnerJoint(string part)
+    {
+        switch (part)
+        {
+            case "Torso": return new Vector3(0f, 0.58f, 0f);
+            case "ArmL": return new Vector3(-0.32f, 1.16f, 0f);
+            case "ArmR": return new Vector3(0.32f, 1.16f, 0f);
+            case "ThighL": return new Vector3(-0.20f, 0.58f, 0f);
+            case "ThighR": return new Vector3(0.20f, 0.58f, 0f);
+            case "ShinL": return new Vector3(-0.20f, 0.31f, 0.03f);
+            case "ShinR": return new Vector3(0.20f, 0.31f, 0.03f);
+        }
+        return Vector3.zero;
+    }
+
+    // Parent part in the rig ("" = the Hips transform).
+    public static string RunnerParent(string part)
+    {
+        if (part.StartsWith("Arm"))
+        {
+            return "Torso";
+        }
+        if (part.StartsWith("Shin"))
+        {
+            return "Thigh" + part.Substring(4);
+        }
+        return "";
+    }
+
+    public static string RunnerMeshPath(string part)
+    {
+        return "Assets/Models/AthleticRat_" + part + ".asset";
+    }
+
+    [MenuItem("Tools/Models/Build Athletic Rat")]
+    public static void BuildAthleticRat()
+    {
+        foreach (string part in RunnerParts)
+        {
+            Save(BuildRunnerPart(part), RunnerMeshPath(part));
+        }
+    }
+
+    public static Mesh BuildRunnerPart(string part)
+    {
+        Begin();
+        float side = part.EndsWith("L") ? -1f : 1f;
+        if (part == "Torso")
+        {
+            AddRunnerTorso();
+        }
+        else if (part.StartsWith("Arm"))
+        {
+            AddRunnerArm(side);
+        }
+        else if (part.StartsWith("Thigh"))
+        {
+            Segment(Body, new Vector3(side * 0.20f, 0.64f, 0f), new Vector3(side * 0.20f, 0.31f, 0.03f), 0.21f, 0.14f);
+        }
+        else
+        {
+            Segment(Body, new Vector3(side * 0.20f, 0.33f, 0.03f), new Vector3(side * 0.20f, 0.07f, 0f), 0.13f, 0.10f);
+            Box(Pink, new Vector3(side * 0.20f, 0.035f, 0.08f), new Vector3(0.15f, 0.07f, 0.28f), Quaternion.identity);
+        }
+        Vector3 joint = RunnerJoint(part);
+        for (int i = 0; i < Vertices.Count; i++)
+        {
+            Vertices[i] = (Vertices[i] - joint) * RunnerScale;
+        }
+        return Finish("Runner" + part, 5);
+    }
+
+    // Builds the rig under `parent` (Visual > RatModel): Hips (no mesh) > Torso > ArmL/ArmR, Hips > ThighL/ThighR >
+    // ShinL/ShinR. meshes in RunnerParts order (null = build them in memory). Returns the Hips transform.
+    public static Transform CreateRunnerRig(Transform parent, Material[] materials, Mesh[] meshes)
+    {
+        Transform hips = new GameObject("Hips").transform;
+        hips.SetParent(parent, false);
+        hips.localPosition = RunnerJoint("Torso") * RunnerScale;
+        Dictionary<string, Transform> made = new Dictionary<string, Transform>();
+        for (int i = 0; i < RunnerParts.Length; i++)
+        {
+            string part = RunnerParts[i];
+            string parentName = RunnerParent(part);
+            Transform up = parentName == "" ? hips : made[parentName];
+            Vector3 upJoint = parentName == "" ? RunnerJoint("Torso") : RunnerJoint(parentName);
+            Transform t = new GameObject(part).transform;
+            t.SetParent(up, false);
+            t.localPosition = (RunnerJoint(part) - upJoint) * RunnerScale;
+            t.gameObject.AddComponent<MeshFilter>().sharedMesh = meshes != null && meshes[i] != null ? meshes[i] : BuildRunnerPart(part);
+            t.gameObject.AddComponent<MeshRenderer>().sharedMaterials = materials;
+            made[part] = t;
+        }
+        return hips;
+    }
+
+    // Body, head (laid-back ears for speed), headband with knot tails, tail.
+    private static void AddRunnerTorso()
+    {
+        VHex(Body, 0.42f, new Vector3(0.32f, -0.26f, 0.24f), 0.85f, new Vector3(0.32f, -0.25f, 0.27f));
+        VHex(Body, 0.85f, new Vector3(0.32f, -0.25f, 0.27f), 1.22f, new Vector3(0.26f, -0.18f, 0.24f));
+        VHex(Body, 1.22f, new Vector3(0.26f, -0.18f, 0.24f), 1.34f, new Vector3(0.22f, -0.15f, 0.20f));
+
+        Hex(Body, -0.17f, new Vector3(0.24f, 1.28f, 1.66f), 0.20f, new Vector3(0.18f, 1.32f, 1.60f));
+        Hex(Body, 0.20f, new Vector3(0.18f, 1.32f, 1.60f), 0.44f, new Vector3(0.07f, 1.40f, 1.51f));
+        Box(Pink, new Vector3(0f, 1.455f, 0.46f), new Vector3(0.10f, 0.08f, 0.06f), Quaternion.identity);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Quaternion tilt = Quaternion.Euler(-50f, side * 20f, side * -25f);
+            Vector3 earPos = new Vector3(side * 0.17f, 1.72f, -0.10f);
+            Box(Body, earPos, new Vector3(0.28f, 0.28f, 0.05f), tilt);
+            Box(Pink, earPos + tilt * new Vector3(0f, 0f, 0.03f), new Vector3(0.20f, 0.20f, 0.02f), tilt);
+            Box(Dark, new Vector3(side * 0.165f, 1.52f, 0.13f), new Vector3(0.06f, 0.07f, 0.07f), Quaternion.identity);
+            for (int k = 0; k < 2; k++)
+            {
+                Quaternion fan = Quaternion.Euler(k == 0 ? -6f : 8f, side * (65f + k * 15f), 0f);
+                Vector3 root = new Vector3(side * 0.06f, 1.44f + k * 0.03f, 0.40f);
+                Box(Dark, root + fan * new Vector3(0f, 0f, 0.15f), new Vector3(0.014f, 0.014f, 0.30f), fan);
+            }
+        }
+
+        // Headband across the forehead (white, red stripe), knot at the back with two tails.
+        Hex(Band, 0.00f, new Vector3(0.235f, 1.46f, 1.655f), 0.12f, new Vector3(0.215f, 1.46f, 1.635f));
+        Hex(Stripe, 0.045f, new Vector3(0.24f, 1.53f, 1.66f), 0.075f, new Vector3(0.235f, 1.53f, 1.655f));
+        Box(Band, new Vector3(0f, 1.56f, -0.19f), new Vector3(0.12f, 0.10f, 0.08f), Quaternion.identity);
+        Segment(Band, new Vector3(0.03f, 1.56f, -0.21f), new Vector3(0.16f, 1.46f, -0.40f), 0.07f, 0.06f);
+        Segment(Band, new Vector3(-0.03f, 1.56f, -0.21f), new Vector3(-0.14f, 1.42f, -0.38f), 0.07f, 0.06f);
+
+        Vector3 start = new Vector3(0f, 0.50f, -0.26f);
+        Vector3 dir = Quaternion.Euler(-10f, 0f, 0f) * Vector3.back;
+        float thick = 0.10f;
+        for (int i = 0; i < 5; i++)
+        {
+            Vector3 next = start + dir * 0.24f;
+            float end = thick * 0.75f;
+            Segment(Pink, start, next, thick, end);
+            start = next;
+            thick = end;
+            dir = Quaternion.Euler(-2f, 12f, 0f) * dir;
+            dir.Normalize();
+        }
+    }
+
+    // Upper arm down to the elbow, forearm bent forward, paw, white wristband.
+    private static void AddRunnerArm(float side)
+    {
+        Vector3 shoulder = RunnerJoint(side < 0f ? "ArmL" : "ArmR");
+        Vector3 elbow = new Vector3(side * 0.39f, 0.88f, -0.03f);
+        Vector3 wrist = new Vector3(side * 0.37f, 0.98f, 0.27f);
+        Segment(Body, shoulder, elbow, 0.16f, 0.14f);
+        Segment(Body, elbow, wrist, 0.14f, 0.13f);
+        Box(Pink, wrist + new Vector3(0f, 0.01f, 0.06f), new Vector3(0.14f, 0.14f, 0.12f), Quaternion.identity);
+        Segment(Band, Vector3.Lerp(elbow, wrist, 0.55f), Vector3.Lerp(elbow, wrist, 0.9f), 0.17f, 0.17f);
+    }
+
+    // ---- Swarm mouse (2026-11-21, new rats step 5; user's pick: a tiny, simple baby mouse). Feet y 0, nose +Z, world
+    // units (the SwarmMouse prefab's Visual is unscaled). Submeshes 0 fur, 1 pink, 2 dark. ~0.6 long with the tail.
+    public const string SwarmMousePath = "Assets/Models/SwarmMouse.asset";
+
+    [MenuItem("Tools/Models/Build Swarm Mouse")]
+    public static void BuildSwarmMouse()
+    {
+        Begin();
+        AddBabyMouse();
+        Save(Finish("SwarmMouse"), SwarmMousePath);
+    }
+
+    // One round body with a small snout, two plain pink round ears, eye dots, a short two-piece tail. 204 tris.
+    private static void AddBabyMouse()
+    {
+        Ball(Body, new Vector3(0f, 0.11f, -0.02f), new Vector3(0.11f, 0.10f, 0.14f), 6);
+        Hex(Body, 0.09f, new Vector3(0.07f, 0.04f, 0.17f), 0.21f, new Vector3(0.025f, 0.07f, 0.12f));
+        Box(Pink, new Vector3(0f, 0.095f, 0.215f), new Vector3(0.035f, 0.03f, 0.02f), Quaternion.identity);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Quaternion tilt = Quaternion.Euler(-105f, side * 20f, side * -15f);
+            Frustum(Pink, new Vector3(side * 0.075f, 0.19f, 0.05f), tilt, new Vector2(0.07f, 0.07f), new Vector2(0.07f, 0.07f), 0.015f, 6);
+            Box(Dark, new Vector3(side * 0.055f, 0.14f, 0.11f), new Vector3(0.03f, 0.035f, 0.03f), Quaternion.identity);
+        }
+        Segment(Pink, new Vector3(0f, 0.06f, -0.15f), new Vector3(0.03f, 0.03f, -0.28f), 0.025f, 0.02f);
+        Segment(Pink, new Vector3(0.03f, 0.03f, -0.28f), new Vector3(0.09f, 0.02f, -0.37f), 0.02f, 0.015f);
     }
 
     // ---- Armor pieces (2026-11-20, enemy layers step 2; user's pick: option 3's bottle cap, option 1's iron lames). Same

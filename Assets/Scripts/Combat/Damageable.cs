@@ -21,6 +21,10 @@
  *   owners may release it back to their pool from the Died handler).
  * - Subclasses can override OnEnable / OnDisable (call base) and OnDied for their own bookkeeping.
  * - Damage numbers and health bars hook into this, so every damageable thing gets them for free.
+ * - Weapon hits go through TakeHit(amount, HitFlags) (2026-11-21): a subclass can refuse hits that lack a property
+ *   (BlocksHit; Enemy refuses non-lead hits when its stats need lead), raising HitBlocked instead of taking damage.
+ *   Plain TakeDamage (enemy bites, debug keys, spill overkill, base dives) never checks.
+ * - FindNearest(from, range, mask, detectsShadow) skips shadow enemies the caller can't see (ShadowSight).
  */
 
 using System;
@@ -40,6 +44,14 @@ public enum TargetMask
 }
 
 public enum TargetRank { Normal, Elite, Boss }
+
+// Properties a hit carries (2026-11-21). Lead = can damage enemies whose stats need lead (pots).
+[Flags]
+public enum HitFlags
+{
+    None = 0,
+    Lead = 1 << 0
+}
 
 public static class TargetMaskExtensions
 {
@@ -166,6 +178,27 @@ public class Damageable : MonoBehaviour, IDamageable
     // DamageNumberSpawner skips targets that return false (trees since 2026-11-20).
     public virtual bool ShowsDamageNumbers => true;
 
+    // A hit this object refuses (e.g. a non-lead hit on a pot), before any damage. For "ping" feedback.
+    public static event Action<Damageable> HitBlocked;
+
+    // True when this object refuses a hit with these properties (Enemy: pots need Lead).
+    protected virtual bool BlocksHit(HitFlags flags)
+    {
+        return false;
+    }
+
+    /// <summary>A weapon hit: refused (HitBlocked, no damage, returns false) if BlocksHit, else TakeDamage.</summary>
+    public bool TakeHit(float amount, HitFlags flags)
+    {
+        if (BlocksHit(flags))
+        {
+            HitBlocked?.Invoke(this);
+            return false;
+        }
+        TakeDamage(amount);
+        return true;
+    }
+
     public virtual void TakeDamage(float amount)
     {
         health -= amount;
@@ -187,13 +220,18 @@ public class Damageable : MonoBehaviour, IDamageable
 
     public static Damageable FindNearest(Vector3 from, float range, TargetMask mask)
     {
+        return FindNearest(from, range, mask, true);
+    }
+
+    public static Damageable FindNearest(Vector3 from, float range, TargetMask mask, bool detectsShadow)
+    {
         Damageable nearest = null;
         float best = range * range;
 
         for (int i = 0; i < All.Count; i++)
         {
             Damageable candidate = All[i];
-            if (!mask.Contains(candidate.category))
+            if (!mask.Contains(candidate.category) || !ShadowSight.CanTarget(candidate, detectsShadow))
             {
                 continue;
             }

@@ -78,6 +78,7 @@ public interface IAimedWeapon
     float SeparationDistance { get; }
     Vector3 SlotDirection { get; }
     bool CanTarget(TargetCategory category);
+    bool DetectsShadow { get; }
     bool FocusWeakestResource { get; }
     bool AvoidCloseRange { get; }
     bool PreferFarTargets { get; }
@@ -409,7 +410,7 @@ public class WeaponLoadout : MonoBehaviour
         for (int i = 0; i < Damageable.All.Count; i++)
         {
             Damageable enemy = Damageable.All[i];
-            if (!AllWeaponsCanTarget(enemy.Category))
+            if (!AllWeaponsCanTarget(enemy.Category) || !AllWeaponsCanSee(enemy))
             {
                 continue;
             }
@@ -438,6 +439,20 @@ public class WeaponLoadout : MonoBehaviour
         }
 
         return closeTarget;
+    }
+
+    // Shadow rats (2026-11-21): the shared close target must be visible to every weapon that takes part in it.
+    private bool AllWeaponsCanSee(Damageable enemy)
+    {
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            if (!weapons[i].AvoidCloseRange && !ShadowSight.CanTarget(enemy, weapons[i].DetectsShadow))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private bool AllWeaponsCanTarget(TargetCategory category)
@@ -600,7 +615,7 @@ public class WeaponLoadout : MonoBehaviour
 
     private bool IsCandidate(IAimedWeapon weapon, Damageable enemy)
     {
-        if (!weapon.CanTarget(enemy.Category))
+        if (!weapon.CanTarget(enemy.Category) || !ShadowSight.CanTarget(enemy, weapon.DetectsShadow))
         {
             return false;
         }
