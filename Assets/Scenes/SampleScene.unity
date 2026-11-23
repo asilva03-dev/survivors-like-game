@@ -860,6 +860,7 @@ MonoBehaviour:
   - name: Turrets
     defenses:
     - {fileID: 11400000, guid: 8101bbb3bb0ae104d8db34279dd4bce6, type: 2}
+    - {fileID: 11400000, guid: f894e3445a741e842a98275df0e2265d, type: 2}
   - name: Traps
     defenses: []
   - name: Other

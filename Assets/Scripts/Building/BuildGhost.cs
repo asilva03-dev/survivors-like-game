@@ -3,8 +3,9 @@
  * The placement ghost of build mode (slice 6 step 4), on the BuildMode object.
  *
  * - While a defense is selected from the bar, a see-through copy of its model (DefensePreview.ModelCopy, no scripts)
- *   follows the mouse, snapped to the centre of the grid tile under the cursor (ground-plane ray at y 0). Its gun
- *   faces the way the turret would (Turret.FindRestDirection), and its white range ring is shown.
+ *   follows the mouse, snapped to the centre of the grid tile under the cursor (ground-plane ray at y 0). Its gun (or,
+ *   for a turret without one, its "Body", 2026-11-23 Trapper) faces the way the turret would (Turret.FindRestDirection),
+ *   and its white range ring (Turret.Range) is shown.
  * - Green (validColor) when TurretPlacer.CanBuild allows the tile, red (invalidColor) otherwise; the hint box shows
  *   the controls and the reason (BuildModeUI.ShowHint).
  * - Left click builds through TurretPlacer.TryBuild (spends the wood). The same defense stays selected so more can be
@@ -239,6 +240,10 @@ public class BuildGhost : MonoBehaviour
         model.transform.localPosition = Vector3.zero;
         model.transform.localRotation = Quaternion.identity;
         gun = FindChild(model.transform, "Gun");
+        if (gun == null)
+        {
+            gun = FindChild(model.transform, "Body");
+        }
 
         foreach (MeshRenderer renderer in model.GetComponentsInChildren<MeshRenderer>())
         {
@@ -255,8 +260,7 @@ public class BuildGhost : MonoBehaviour
 
     private void UpdateRing(TurretDefinition defense)
     {
-        TurretGun turretGun = defense.Prefab.GetComponentInChildren<TurretGun>(true);
-        float range = turretGun != null ? turretGun.Range : 0f;
+        float range = defense.Prefab != null ? defense.Prefab.Range : 0f;
         ring.enabled = range > 0f;
         ring.startWidth = ringWidth;
         ring.endWidth = ringWidth;

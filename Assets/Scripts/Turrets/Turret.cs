@@ -8,7 +8,8 @@
  * - No health and never targeted (walls and turrets can't be damaged). No collider that blocks the player.
  * - RestDirection (set in Init): toward the nearest Path cell within 12 cells (else the nearest walkable cell,
  *   else north). The gun starts facing it and scans around it while idle (see TurretGun).
- * - Range comes from its TurretGun; SpacingRadius from the definition. The no-build area is the set of tiles its
+ * - Range comes from its TurretGun, or (2026-11-23, Trapper) its TrapThrower when it has no gun; SpacingRadius from the
+ *   definition. Upgrades and the body-model swap only apply to gun turrets (a turret without a gun has no stats to change). The no-build area is the set of tiles its
  *   spacing circle touches (CircleTouches; the tile rule, slice 6); BuildStripHighlight paints those strip tiles red.
  *   Static event ActiveChanged fires when a turret is placed or removed.
  * - Upgrades (slice 6 step 5): Tier(path), NextUpgrade(path), CanUpgrade(path, out reason) (the Bloons rule from the
@@ -39,6 +40,8 @@ public class Turret : MonoBehaviour
 
     [SerializeField] private TurretDefinition definition;
     [SerializeField] private TurretGun gun;
+    [Tooltip("Turrets without a gun (Trapper): the trap thrower, for the range.")]
+    [SerializeField] private TrapThrower thrower;
     [Tooltip("The turning body's MeshFilter; upgrade tiers with a Body Mesh swap its mesh.")]
     [SerializeField] private MeshFilter bodyModel;
 
@@ -46,7 +49,7 @@ public class Turret : MonoBehaviour
     public Vector2Int Cell { get; private set; }
     public Vector3 RestDirection { get; private set; } = Vector3.forward;
     public float SpacingRadius => definition != null ? definition.SpacingRadius : 0f;
-    public float Range => gun != null ? gun.Range : 0f;
+    public float Range => gun != null ? gun.Range : thrower != null ? thrower.Range : 0f;
     public Vector3 Center => new Vector3(transform.position.x, 0f, transform.position.z);
 
     public const string MaxTierReason = "Max tier";
