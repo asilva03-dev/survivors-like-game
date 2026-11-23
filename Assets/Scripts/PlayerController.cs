@@ -37,6 +37,10 @@
  * - FeetHeight = how far the feet are above the world ground (y 0); OutOfBiteReach (feet above biteClearHeight, in the
  *   air or on a wall top) stops enemy contact damage (Enemy). Enemy bullets still hit. OutOfBiteReachFrom(enemy feet)
  *   (2026-10-29, used by Enemy) measures the same against an enemy's feet instead of y 0, so hills and cliffs count.
+ * - OnStructure (2026-11-22, user: enemies don't track a player standing on a fence or the box): true while the player
+ *   stands on a wall block (structureLayer, "Wall") or the base box (a BaseStructure collider), judged from the nearest
+ *   thing the ground check hits. While airborne it keeps its last value, so a jump between fence tops or off the box
+ *   doesn't flip it; landing on anything else clears it. Enemy uses it to leave the player alone.
  */
 
 using UnityEngine;
@@ -83,6 +87,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField, Min(0.01f)] private float groundCheckDistance = 0.08f;
     [Tooltip("Feet higher than this above the world ground (jumping or on a wall top) are out of enemy bite reach.")]
     [SerializeField, Min(0f)] private float biteClearHeight = 0.5f;
+    [Tooltip("Standing on a collider on this layer (the wall blocks) counts as being on a structure: enemies leave the player alone.")]
+    [SerializeField] private string structureLayer = "Wall";
 
     [Header("Input")]
     [SerializeField] private InputAction moveAction = new InputAction("Move", InputActionType.Value, expectedControlType: "Vector2");
@@ -132,6 +138,8 @@ public class PlayerController : MonoBehaviour
     public float JumpSpeed => 4f * jumpHeight / jumpAirTime;
     public float FeetHeight => transform.position.y - HalfHeight;
     public bool OutOfBiteReach => FeetHeight > biteClearHeight;
+    /// <summary>Standing on a fence (wall block) or the base box; kept while airborne (see the header).</summary>
+    public bool OnStructure { get; private set; }
     /// <summary>Out of bite reach of an enemy whose feet are at world y `enemyFeet`: more than biteClearHeight above or below them.</summary>
     public bool OutOfBiteReachFrom(float enemyFeet) => Mathf.Abs(FeetHeight - enemyFeet) > biteClearHeight;
 
@@ -422,6 +430,10 @@ public class PlayerController : MonoBehaviour
             jumpRising = false;
         }
         IsGrounded = jumpGrace <= 0f && !jumpRising && CheckGround();
+        if (IsGrounded)
+        {
+            OnStructure = IsStructure(groundCollider);
+        }
         if (IsGrounded && !wasGrounded)
         {
             landedThisStep = true;
@@ -478,14 +490,35 @@ public class PlayerController : MonoBehaviour
         float distance = HalfHeight - radius + groundCheckDistance;
         int count = Physics.SphereCastNonAlloc(body.position, radius, Vector3.down, groundHits, distance, groundMask,
             QueryTriggerInteraction.Ignore);
+        groundCollider = null;
+        float nearest = float.MaxValue;
         for (int i = 0; i < count; i++)
         {
-            if (groundHits[i].collider.attachedRigidbody != body)
+            if (groundHits[i].collider.attachedRigidbody != body && groundHits[i].distance < nearest)
             {
-                return true;
+                nearest = groundHits[i].distance;
+                groundCollider = groundHits[i].collider;
             }
         }
-        return false;
+        return groundCollider != null;
+    }
+
+    private Collider groundCollider;
+    private int structureLayerIndex = -2;
+
+    // A wall block (structureLayer) or the base box.
+    private bool IsStructure(Collider ground)
+    {
+        if (ground == null)
+        {
+            return false;
+        }
+        if (structureLayerIndex == -2)
+        {
+            structureLayerIndex = LayerMask.NameToLayer(structureLayer);
+        }
+        return (structureLayerIndex >= 0 && ground.gameObject.layer == structureLayerIndex)
+            || ground.GetComponentInParent<BaseStructure>() != null;
     }
 
     private void AddMoveBindings()

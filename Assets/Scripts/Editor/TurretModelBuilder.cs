@@ -13,6 +13,10 @@
  *   round yellow cat looking out with its paws on the rim, the old model's Y-sight, an ammo box with a brass belt.
  * - Submeshes: 0 main (armour), 1 accent (trim, mantlet), 2 dark (barrel, rivets, sight, ammo box), 3 cat (yellow),
  *   4 brass (ammo belt, cat ears). Materials in Materials/Models/gunturret/.
+ * - Double barrel (2026-11-23, Fire Rate T3 "Double Barreled", user's pick B): the same build writes
+ *   Models/GunTurretBodyDouble.asset: the body with two barrels side by side at +-TwinX (matching the 0.3 bullet spacing at
+ *   the prefab's 1.35 scale), each with its own muzzle brake, held together by two bands, in a wider mantlet. The upgrade
+ *   tier swaps the turret's body mesh to it (TurretUpgrade.bodyMesh).
  * - Flat-shaded quads/polygons like RatModelBuilder (its helpers are private; these are the same shapes).
  */
 
@@ -24,6 +28,7 @@ public static class TurretModelBuilder
 {
     public const string BasePath = "Assets/Models/GunTurretBase.asset";
     public const string BodyPath = "Assets/Models/GunTurretBody.asset";
+    public const string DoubleBodyPath = "Assets/Models/GunTurretBodyDouble.asset";
     public const float PivotHeight = 1.56f;
     /// <summary>How far in front of the pivot the barrel ends (GunStats muzzleOffset should match).</summary>
     public const float MuzzleZ = 0.99f;
@@ -47,6 +52,7 @@ public static class TurretModelBuilder
     {
         Save(BuildBase(), BasePath);
         Save(BuildBody(), BodyPath);
+        Save(BuildBody(true), DoubleBodyPath);
     }
 
     // Writes the mesh to `path`, rebuilding an existing asset in place (prefabs keep their reference).
@@ -97,6 +103,14 @@ public static class TurretModelBuilder
 
     public static Mesh BuildBody()
     {
+        return BuildBody(false);
+    }
+
+    // Barrels sit at +-TwinX on the double body (matches the 0.3 bullet spacing at the prefab's 1.35 scale).
+    private const float TwinX = 0.111f;
+
+    private static Mesh BuildBody(bool twin)
+    {
         Begin();
         Vector3 hatch = new Vector3(0f, 0.2f, -0.12f);
         float barrelY = -0.02f;
@@ -106,17 +120,27 @@ public static class TurretModelBuilder
         Prism(Accent, new Vector3(0f, -0.30f, -0.02f), new Vector2(0.84f, 0.96f), new Vector2(0.80f, 0.92f), 0.04f, Vector3.zero);
         Box(Main, new Vector3(0f, -0.08f, -0.56f), new Vector3(0.54f, 0.26f, 0.18f), Quaternion.identity);
         Box(Dark, new Vector3(0f, -0.08f, -0.66f), new Vector3(0.44f, 0.16f, 0.03f), Quaternion.identity);
-        Frustum(Accent, new Vector3(0f, barrelY, 0.30f), Quaternion.Euler(90f, 0f, 0f), 0.17f, 0.15f, 0.20f, 8);
+        if (!twin)
+        {
+            Frustum(Accent, new Vector3(0f, barrelY, 0.30f), Quaternion.Euler(90f, 0f, 0f), 0.17f, 0.15f, 0.20f, 8);
+        }
         Rivets(0.28f, 0.17f, -0.40f, 0.12f, 4);
 
-        // Single barrel: a thicker breech, the tube, a band and a muzzle brake with side ports (tip at MuzzleZ).
-        Frustum(Dark, new Vector3(0f, barrelY, 0.46f), Quaternion.Euler(90f, 0f, 0f), 0.09f, 0.08f, 0.14f, 8);
-        Frustum(Dark, new Vector3(0f, barrelY, 0.58f), Quaternion.Euler(90f, 0f, 0f), 0.065f, 0.06f, 0.30f, 8);
-        Frustum(Accent, new Vector3(0f, barrelY, 0.68f), Quaternion.Euler(90f, 0f, 0f), 0.08f, 0.08f, 0.04f, 8);
-        Box(Dark, new Vector3(0f, barrelY, MuzzleZ - 0.07f), new Vector3(0.17f, 0.12f, 0.14f), Quaternion.identity);
-        for (int side = -1; side <= 1; side += 2)
+        if (!twin)
         {
-            Box(Accent, new Vector3(side * 0.088f, barrelY, MuzzleZ - 0.07f), new Vector3(0.01f, 0.07f, 0.08f), Quaternion.identity);
+            // Single barrel: a thicker breech, the tube, a band and a muzzle brake with side ports (tip at MuzzleZ).
+            Barrel(0f, barrelY);
+        }
+        else
+        {
+            // Twin barrels in a wider mantlet, each with its own brake, clamped together by two bands.
+            Frustum(Accent, new Vector3(0f, barrelY, 0.30f), Quaternion.Euler(90f, 0f, 0f), new Vector2(0.27f, 0.17f), new Vector2(0.25f, 0.15f), 0.20f, 8);
+            Barrel(-TwinX, barrelY);
+            Barrel(TwinX, barrelY);
+            for (int i = 0; i < 2; i++)
+            {
+                Box(Accent, new Vector3(0f, barrelY, 0.62f + i * 0.16f), new Vector3(2f * TwinX + 0.15f, 0.13f, 0.04f), Quaternion.identity);
+            }
         }
 
         // Round hatch: rim, the lid flipped open behind it, the cat looking out with its paws on the rim.
@@ -148,7 +172,20 @@ public static class TurretModelBuilder
         {
             Box(Dark, new Vector3(0.36f, -0.10f, -0.20f + i * 0.12f), new Vector3(0.02f, 0.16f, 0.05f), Quaternion.Euler(0f, 0f, 12f));
         }
-        return Finish("GunTurretBody");
+        return Finish(twin ? "GunTurretBodyDouble" : "GunTurretBody");
+    }
+
+    // One barrel at x: breech, tube, band and a muzzle brake with side ports, tip at MuzzleZ.
+    private static void Barrel(float x, float y)
+    {
+        Frustum(Dark, new Vector3(x, y, 0.46f), Quaternion.Euler(90f, 0f, 0f), 0.09f, 0.08f, 0.14f, 8);
+        Frustum(Dark, new Vector3(x, y, 0.58f), Quaternion.Euler(90f, 0f, 0f), 0.065f, 0.06f, 0.30f, 8);
+        Frustum(Accent, new Vector3(x, y, 0.68f), Quaternion.Euler(90f, 0f, 0f), 0.08f, 0.08f, 0.04f, 8);
+        Box(Dark, new Vector3(x, y, MuzzleZ - 0.07f), new Vector3(0.17f, 0.12f, 0.14f), Quaternion.identity);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Box(Accent, new Vector3(x + side * 0.088f, y, MuzzleZ - 0.07f), new Vector3(0.01f, 0.07f, 0.08f), Quaternion.identity);
+        }
     }
 
     // Rows of dark rivets along both top edges (x = half width, y height, from z0 to z1).

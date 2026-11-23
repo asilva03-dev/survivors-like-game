@@ -23,6 +23,14 @@ MonoBehaviour:
   contactRange: 1.4
   contactInterval: 1
   baseHitDamage: 25
+  needsLead: 0
+  jumpsWalls: 0
+  stunImmune: 1
+  spacingScale: 1
+  swarmSize: 0
+  swarmReserve: 0
+  swarmRefillDelay: {x: 3, y: 4}
+  swarmCohesion: 3
   spillCount: 4
   spillArmorLayers: 2
   spillSpread: 1.5

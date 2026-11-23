@@ -27,6 +27,14 @@
  * - Only Damageable colliders take damage; the owner's own colliders are ignored.
  *   Hitting any other collider also returns the projectile to the pool. Colliders on the "Wall" layer (base wall
  *   blocks) are skipped entirely (HitMask), so bullets fly over the walls.
+ * - Nearby homing (2026-11-23): with a homingRadius > 0 (GunStats.HomingRadius) a homing bullet ignores the gun's target
+ *   and steers at the nearest enemy within that radius of itself that it hasn't hit and can see (ShadowSight), keeping its
+ *   current one while it stays in range; with none that close it flies straight. The flew-past give-up still applies.
+ * - Slowing bullets (2026-11-23): a gun with GunStats.SlowPerStack > 0 gives every enemy it hits (also a pot's refused hit)
+ *   a slow stack (Enemy.AddSlowStack), and with InfectChance each other enemy within InfectRadius of it gets one by chance
+ *   (event StackSpread(from, to) for the look; InfectProc(from, radius) once per hit that spread at least one stack).
+ * - Explosive bullets (2026-11-22): a gun whose GunStats.ExplosionChance > 0 rolls it on every enemy hit (also one a pot
+ *   refuses) and sets off BulletBlasts.Explode at the enemy's aim point.
  * - The trail is cleared on launch so a reused projectile does not streak from its old position.
  * - Pooled prefab setup: shared unlit material, shadows off, TrailRenderer on a child at the back.
  */
@@ -72,18 +80,20 @@ public class Projectile : MonoBehaviour
     private bool homingAcquired;
     private System.Func<Damageable> retarget;
     private int piercesLeft;
+    private float homingRadius;
     private readonly System.Collections.Generic.List<Damageable> hitTargets = new System.Collections.Generic.List<Damageable>();
 
     public void Launch(ComponentPool<Projectile> owningPool, Vector3 travelDirection, float travelSpeed,
         WeaponStats weaponStats, float maxLifetime, Transform ignore,
         Vector3? settleDirection = null, float steerDegreesPerSecond = 0f,
         Damageable homeOn = null, float homingDegreesPerSecond = 0f, System.Func<Damageable> retargetCallback = null,
-        int pierce = 1)
+        int pierce = 1, float nearbyHomingRadius = 0f)
     {
         piercesLeft = Mathf.Max(1, pierce);
+        homingRadius = homingDegreesPerSecond > 0f ? nearbyHomingRadius : 0f;
         hitTargets.Clear();
-        homingActive = homingDegreesPerSecond > 0f && homeOn != null;
-        homingTarget = homingActive ? homeOn : null;
+        homingActive = homingDegreesPerSecond > 0f && (homeOn != null || homingRadius > 0f);
+        homingTarget = homingActive && homingRadius <= 0f ? homeOn : null;
         homingSpeed = homingDegreesPerSecond;
         homingAcquired = false;
         retarget = homingActive ? retargetCallback : null;
@@ -176,7 +186,20 @@ public class Projectile : MonoBehaviour
             homingAcquired = false;
         }
 
-        if (homingTarget == null && retarget != null)
+        if (homingRadius > 0f)
+        {
+            Damageable next = NearestInReach(homingTarget);
+            if (next != homingTarget)
+            {
+                homingAcquired = false;
+            }
+            homingTarget = next;
+            if (homingTarget == null)
+            {
+                return;
+            }
+        }
+        else if (homingTarget == null && retarget != null)
         {
             homingTarget = retarget();
             if (homingTarget != null && hitTargets.Contains(homingTarget))
@@ -213,6 +236,74 @@ public class Projectile : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(direction);
     }
 
+    // Infectious Fatigue: each enemy near `source` gets a stack with the gun's InfectChance (no further spreading).
+    private static void Infect(Enemy source, GunStats gun)
+    {
+        Vector3 here = source.transform.position;
+        float sqrRadius = gun.InfectRadius * gun.InfectRadius;
+        System.Collections.Generic.List<Enemy> enemies = Enemy.Active;
+        bool procced = false;
+        for (int i = enemies.Count - 1; i >= 0; i--)
+        {
+            Enemy other = enemies[i];
+            if (other == source)
+            {
+                continue;
+            }
+            Vector3 offset = other.transform.position - here;
+            offset.y = 0f;
+            if (offset.sqrMagnitude <= sqrRadius && Random.value < gun.InfectChance
+                && other.AddSlowStack(gun.SlowPerStack, gun.SlowMaxStacks, gun.SlowDuration, gun.StunDuration, gun.StunImmunity))
+            {
+                InfectedStacks++;
+                StackSpread?.Invoke(source, other);
+                procced = true;
+            }
+        }
+        if (procced)
+        {
+            InfectProc?.Invoke(source, gun.InfectRadius);
+        }
+    }
+
+    /// <summary>Infectious Fatigue spread at least one stack from this enemy, within this radius (once per hit).</summary>
+    public static event System.Action<Enemy, float> InfectProc;
+
+    /// <summary>A slow stack spread from the hit enemy (first) to a nearby one (second): EnemyStatusLook shows it.</summary>
+    public static event System.Action<Enemy, Enemy> StackSpread;
+
+    /// <summary>Stacks spread by Infectious Fatigue (for tests).</summary>
+    public static int InfectedStacks { get; private set; }
+
+    // Nearby homing: keep `current` while it is still within homingRadius, else the nearest enemy in reach (null = none).
+    private Damageable NearestInReach(Damageable current)
+    {
+        Vector3 here = transform.position;
+        float sqrRadius = homingRadius * homingRadius;
+        AimedWeaponStats aimed = stats as AimedWeaponStats;
+        bool seesShadows = aimed != null && aimed.DetectsShadow;
+        if (current != null && current.isActiveAndEnabled && !hitTargets.Contains(current)
+            && (current.AimPoint - here).sqrMagnitude <= sqrRadius)
+        {
+            return current;
+        }
+        Damageable best = null;
+        float bestSqr = sqrRadius;
+        System.Collections.Generic.List<Enemy> enemies = Enemy.Active;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            Enemy enemy = enemies[i];
+            float sqr = (enemy.AimPoint - here).sqrMagnitude;
+            if (sqr > bestSqr || hitTargets.Contains(enemy) || !ShadowSight.CanTarget(enemy, seesShadows))
+            {
+                continue;
+            }
+            best = enemy;
+            bestSqr = sqr;
+        }
+        return best;
+    }
+
     // Deals damage and remembers the target so a piercing bullet never hits it twice.
     // Returns true when this was the bullet's last hit (pierce used up) and it must be released.
     private bool HitAndCheckDone(Damageable target)
@@ -235,6 +326,18 @@ public class Projectile : MonoBehaviour
         if (amount > 0f)
         {
             target.TakeHit(amount, stats.HitFlags);
+        }
+        GunStats gun = stats as GunStats;
+        Enemy enemy = target as Enemy;
+        if (gun != null && gun.SlowPerStack > 0f && enemy != null
+            && enemy.AddSlowStack(gun.SlowPerStack, gun.SlowMaxStacks, gun.SlowDuration, gun.StunDuration, gun.StunImmunity)
+            && gun.InfectChance > 0f)
+        {
+            Infect(enemy, gun);
+        }
+        if (gun != null && gun.ExplosionChance > 0f && target is Enemy && Random.value < gun.ExplosionChance)
+        {
+            BulletBlasts.Explode(target.AimPoint, gun, target);
         }
     }
 

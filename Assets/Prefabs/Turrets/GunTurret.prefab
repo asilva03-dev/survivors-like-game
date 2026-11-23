@@ -52,6 +52,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Turret
   definition: {fileID: 11400000, guid: 8101bbb3bb0ae104d8db34279dd4bce6, type: 2}
   gun: {fileID: 5802020656550299790}
+  bodyModel: {fileID: 7625669724829889115}
 --- !u!114 &8870884009941525408
 MonoBehaviour:
   m_ObjectHideFlags: 0

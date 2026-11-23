@@ -1,24 +1,22 @@
 /*
  * EnemySpawner
  * Pooled enemy spawner: where and as what each enemy appears. It no longer spawns on its own (round system step 2,
- * 2026-11-05): RunDirector calls TrySpawn once per enemy at the current wave's rate. The old steady stream
- * (spawnsPerSecond) and the alive cap (maxEnemies) were removed (the cap was a test aid, user).
- *
- * - TrySpawn(rangedChance, armorLayers, bagChance): one enemy (armorLayers extra layers on a layered enemy, 2026-11-20;
- *   ranged rats and bag rats have no layers and ignore it; bagChance of the base-bound spawns are bag rats), split between the base and the player as below; false (nothing spawned, counted
- *   in SkippedSpawns) when no valid spot was found, spawning is paused, or there is no player.
+ * 2026-11-05): the spawn director (RunDirector) releases the packs it bought through SpawnPack (see below; the old
+ * one-at-a-time TrySpawn was removed in spawn director step 5, 2026-11-22). The old steady stream (spawnsPerSecond) and
+ * the alive cap (maxEnemies) were removed earlier (the cap was a test aid, user). A pack that finds no valid spot is
+ * counted in SkippedSpawns.
  * - Enemies come from ComponentPools built from enemyPrefab (normal) and rangedEnemyPrefab (prewarmed), never
  *   Instantiate/Destroy at runtime. Dead enemies return to the pool they came from via Damageable.Died, and hunters
  *   that retreated off-screen via Enemy.DespawnRequested (no death), and enemies that dived into the base via
  *   Enemy.EnteredBase (no death, no refund).
- * - Split: each spawn goes to the player with probability PlayerShare, else to the base. PlayerShare is 0 while the
+ * - Split: each pack goes to the player with probability PlayerShare, else to the base (side rules in SpawnPack). PlayerShare is 0 while the
  *   player is in the BaseLight; in the dark it rises from playerShareMin to playerShareMax over playerShareRampTime
  *   seconds and resets when the player returns to the light. No BaseLight = always the dark.
  * - Player share: spawned at an off-screen spot around the player (minSpawnDistance, stepping outward) that is also
- *   at least lightClearance outside the light; the wave's rangedChance of them are ranged rats (hunters), the rest basic rats
- *   assigned to the player (Enemy.Assignment). Ranged rats only ever come from this share. With a map (MapRoutes) the
+ *   at least lightClearance outside the light, assigned to the player (Enemy.Assignment). Ranged rats only ever come
+ *   from this share. With a map (MapRoutes) the
  *   spot must also have a walking route to the player, so hills and slopes are fine but sealed-off ground is not.
- * - Base share (user's rule, 2026-10-30): a basic rat assigned to the base, at a random direction around the light,
+ * - Base share (user's rule, 2026-10-30): assigned to the base, at a random direction around the light (or near the pack's front),
  *   starting just outside it in the dark (light TargetRadius + baseSpawnGap + up to baseSpawnBand); if that spot is on
  *   screen it is pushed straight outward until just past the camera's view, so it spawns as close to the light as the
  *   camera allows. With a map the spot must have a route to the base.
@@ -29,7 +27,7 @@
  * - Recycling: player-assigned enemies farther than recycleDistance from the player are moved to a fresh
  *   player-share spot (biased within aheadAngle of the player's movement); if none is found they stay where they are.
  *   Base-bound enemies are never recycled (they are walking to the base) and retreating hunters despawn on their own.
- * - SpawnsEnabled pauses/resumes spawning (TrySpawn refuses while paused; the run clock keeps going) and raises
+ * - SpawnsEnabled pauses/resumes spawning (SpawnPack refuses while paused; the run clock keeps going) and raises
  *   SpawnsEnabledChanged. Enemies already alive keep moving and recycling. DebugKillAll toggles it.
  * - Spill (2026-11-20, bag rat): an enemy whose EnemyStats.SpillCount > 0 spills that many basic rats from the normal
  *   pool where it died (same assignment and shadow property, the stats' armor layers, pushed out evenly by Enemy.Knockback over spillSpread),
@@ -41,6 +39,16 @@
  *   director (which will keep them out of the player's dark share).
  * - Swarm mice (2026-11-21, rat swarm): swarmEnemyPrefab's pool. SpawnForBase(Swarm) spawns a whole swarm through
  *   RatSwarms.Spawn, which takes each mouse from here with SpawnSwarmMouse (also its refills). Base-bound only for now.
+ * - SpawnPack(type, count, shadow, side, spawned) (spawn director step 2, 2026-11-21): one pack the director bought,
+ *   released together at one spot. The light/dark split is rolled once for the whole pack (PlayerShare): BaseOnly packs
+ *   always go for the base; DarkOnly packs (ranged) only for the player, so a roll for the base returns NeedsDark (the
+ *   director retries later). The spot is a normal player- or base-share spot; members are spread around it
+ *   (packSpread). A Swarm pack is one RatSwarms swarm. Spawned enemies are added to `spawned` (the director tracks them for
+ *   refunds). NoSpot (nothing spawned) when no valid spot was found, spawns are paused or there is no player.
+ *   Fronts (spawn director step 3): a base-bound pack given a frontYaw (degrees around the light, 0 = +Z) spawns within
+ *   frontJitter of it (the same just-outside-the-light, pushed-off-screen spot as the base share); if no valid spot
+ *   is found there for the first frontAttempts tries, the rest of the tries widen to any direction. The player's dark
+ *   share ignores fronts (it spawns around the player as before).
  * - SpawnForBase(kind, armorLayers, shadow) (2026-11-21): one base-bound enemy at a base-share spot for debug keys and
  *   tests (DebugSpawnKeys); no budget, ignores the share and the spawn pause.
  * - BaseAliveCount / PlayerAliveCount: alive enemies by assignment (debug line).
@@ -61,7 +69,7 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Min(0)] private int rangedPrewarmCount = 10;
     [Tooltip("Basic rats made at load (the pool grows if more are needed, with a small hitch).")]
     [SerializeField, Min(1)] private int prewarmCount = 30;
-    [Tooltip("Bag rat (2026-11-20): base-bound only, a wave's bagChance of base spawns. Empty = none.")]
+    [Tooltip("Bag rat (2026-11-20): base-bound only (SpawnPrices side). Empty = none.")]
     [SerializeField] private Enemy bagEnemyPrefab;
     [SerializeField, Min(0)] private int bagPrewarmCount = 2;
     [Tooltip("Pot rat (2026-11-21): a pot carried by rats; only lead hits break it. Spawned by SpawnForBase (debug) until the spawn director.")]
@@ -100,6 +108,12 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Min(0f)] private float mapEdgeMargin = 2f;
     [Tooltip("A base-share spot on screen is pushed outward in steps of this size until it is off screen.")]
     [SerializeField, Min(0.25f)] private float offscreenPushStep = 1f;
+    [Tooltip("Director packs: members are spread around the pack's spot this far apart.")]
+    [SerializeField, Min(0f)] private float packSpread = 0.8f;
+    [Tooltip("Director fronts: a base-bound pack spawns within this many degrees either side of its front's direction.")]
+    [SerializeField, Range(0f, 180f)] private float frontJitter = 15f;
+    [Tooltip("Director fronts: tries near the front before any direction is allowed (of the 12 tries).")]
+    [SerializeField, Range(1, 12)] private int frontAttempts = 8;
 
     private readonly Dictionary<Enemy, ComponentPool<Enemy>> alive = new Dictionary<Enemy, ComponentPool<Enemy>>();
     private readonly List<Enemy> scratch = new List<Enemy>();
@@ -239,50 +253,76 @@ public class EnemySpawner : MonoBehaviour
     /// <summary>Spawns that found no valid spot and were skipped (for testing).</summary>
     public int SkippedSpawns { get; private set; }
 
-    /// <summary>Spawns one enemy (base or player share, see the header). False when nothing spawned.</summary>
-    public bool TrySpawn(float rangedChance, int armorLayers = 0, float bagChance = 0f)
+    public enum Kind { Basic, Ranged, Bag, Pot, Athletic, Swarm }
+
+    public enum PackResult { Spawned, NoSpot, NeedsDark }
+
+    /// <summary>The spawn director's packs (see the header).</summary>
+    public PackResult SpawnPack(RatType type, int count, bool shadow, SpawnSide side, List<Enemy> spawned,
+        float frontYaw = float.NaN)
     {
         if (!spawnsEnabled || player == null)
         {
-            return false;
+            return PackResult.NoSpot;
         }
         if (cam == null)
         {
             cam = Camera.main;
         }
-
-        Vector3 point;
-        if (Random.value < PlayerShare)
+        bool toPlayer = side != SpawnSide.BaseOnly && Random.value < PlayerShare;
+        if (side == SpawnSide.DarkOnly && !toPlayer)
         {
-            bool ranged = rangedPool != null && Random.value < rangedChance;
-            ComponentPool<Enemy> source = ranged ? rangedPool : pool;
-            if (!TryFindPlayerSpawnPoint(false, out point))
-            {
-                SkippedSpawns++;
-                return false;
-            }
-            Enemy hunter = source.Get(point, Quaternion.identity);
-            hunter.Assignment = EnemyAssignment.Player;
-            hunter.SetExtraLayers(armorLayers);
-            alive.Add(hunter, source);
-            return true;
+            return PackResult.NeedsDark;
         }
-
-        if (!TryFindBaseSpawnPoint(out point))
+        Vector3 point;
+        if (toPlayer ? !TryFindPlayerSpawnPoint(false, out point) : !TryFindBaseSpawnPoint(frontYaw, out point))
         {
             SkippedSpawns++;
-            return false;
+            return PackResult.NoSpot;
         }
-        bool bag = bagPool != null && Random.value < bagChance;
-        ComponentPool<Enemy> baseSource = bag ? bagPool : pool;
-        Enemy enemy = baseSource.Get(point, Quaternion.identity);
-        enemy.Assignment = EnemyAssignment.Base;
-        enemy.SetExtraLayers(armorLayers);
-        alive.Add(enemy, baseSource);
-        return true;
-    }
+        EnemyAssignment assignment = toPlayer ? EnemyAssignment.Player : EnemyAssignment.Base;
 
-    public enum Kind { Basic, Ranged, Bag, Pot, Athletic, Swarm }
+        EnemySpawner.Kind kind;
+        int armorLayers;
+        SpawnPrices.ToSpawn(type, out kind, out armorLayers);
+        if (kind == Kind.Swarm)
+        {
+            RatSwarms swarms = RatSwarms.Instance;
+            Enemy first = swarms != null && swarmPool != null ? swarms.Spawn(point, assignment, shadow) : null;
+            if (first == null)
+            {
+                return PackResult.NoSpot;
+            }
+            if (spawned != null && first.Swarm != null)
+            {
+                spawned.AddRange(first.Swarm.Members);
+            }
+            return PackResult.Spawned;
+        }
+
+        ComponentPool<Enemy> source = kind == Kind.Ranged ? rangedPool : kind == Kind.Bag ? bagPool : kind == Kind.Pot ? potPool
+            : kind == Kind.Athletic ? athleticPool : pool;
+        if (source == null)
+        {
+            return PackResult.NoSpot;
+        }
+        for (int i = 0; i < Mathf.Max(1, count); i++)
+        {
+            float radius = i == 0 ? 0f : packSpread * Mathf.Sqrt(i);
+            float angle = i * 2.399963f;
+            Vector3 spot = OnGround(point + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius);
+            Enemy enemy = source.Get(spot, Quaternion.identity);
+            enemy.Assignment = assignment;
+            enemy.SetExtraLayers(armorLayers);
+            enemy.SetShadow(shadow);
+            alive.Add(enemy, source);
+            if (spawned != null)
+            {
+                spawned.Add(enemy);
+            }
+        }
+        return PackResult.Spawned;
+    }
 
     /// <summary>
     /// Debug / tests (2026-11-21): spawns one enemy of `kind` heading for the base at a normal base-share spot (off screen
@@ -461,6 +501,12 @@ public class EnemySpawner : MonoBehaviour
     // A random direction around the light, just outside it in the dark; pushed straight outward until off screen.
     private bool TryFindBaseSpawnPoint(out Vector3 point)
     {
+        return TryFindBaseSpawnPoint(float.NaN, out point);
+    }
+
+    // As above, aimed at a director front (frontYaw degrees; NaN = any direction).
+    private bool TryFindBaseSpawnPoint(float frontYaw, out Vector3 point)
+    {
         BaseLight baseLight = BaseLight.Instance;
         if (baseLight == null)
         {
@@ -470,7 +516,9 @@ public class EnemySpawner : MonoBehaviour
         Vector3 center = baseLight.Center;
         for (int attempt = 0; attempt < SpawnAttempts; attempt++)
         {
-            float yaw = Random.Range(0f, 360f);
+            float yaw = !float.IsNaN(frontYaw) && attempt < frontAttempts
+                ? frontYaw + Random.Range(-frontJitter, frontJitter)
+                : Random.Range(0f, 360f);
             float radius = baseLight.TargetRadius + baseSpawnGap + Random.Range(0f, baseSpawnBand);
             point = OnRing(center, yaw, radius);
             for (int push = 0; push < 200 && !IsOffscreen(OnGround(point)) && IsOnMap(point); push++)

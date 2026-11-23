@@ -1,18 +1,21 @@
 /*
  * RunTimeline
  * The run's script of enemy waves (round system step 1, 2026-11-05): a time-based run like Vampire Survivors. The
- * player only sees a timer counting up; underneath, waves start at set times, each with its own enemy budget and rate.
+ * player only sees a timer counting up; underneath, waves start at set times, each with its own Director card.
  *
  * - runLength: seconds from the run's start (the base chunk placed) until the run ends.
  * - Waves (in start-time order): a wave lasts from its startTime until the next wave's startTime (the last one until
- *   runLength). It spawns `budget` enemies at `spawnRate` per second; whatever is left when the wave ends is dropped.
- *   rangedChance = share of the spawns that come for the player in the dark that are ranged hunters (the light/dark
- *   split itself stays on EnemySpawner). intensity only picks hint text; it does not change spawning.
- *   armorWeights (2026-11-20): weights for how many armor layers a basic rat spawns with (index = extra layers;
- *   PickArmor rolls one). Empty = all bare. bagChance: share of base-bound spawns that are bag rats.
+ *   runLength). intensity only picks hint text; it does not change spawning.
+ * - Director card (spawn director, 2026-11-21/22; user: guided-random waves, a threat-budget director): what the wave
+ *   spawns. RunDirector has WaveShopper spend it at the wave's start: threatBudget (+- budgetVariance), a menu
+ *   (RatType + weight, and a shadowChance), mustInclude (bought first, even past the budget), minShadowThreat (at least
+ *   this much threat bought as shadows), limits (max rats of a type), fronts (min-max directions the base-bound packs
+ *   come from) and releaseSpan (the share of the wave's length its packs are released over). prices = the SpawnPrices
+ *   asset. The old per-wave columns (budget, spawnRate, rangedChance, armorWeights, bagChance) were removed in step 5
+ *   (user OK, 2026-11-22).
  * - Hints: hintLeadTime seconds before a wave whose intensity differs from the current wave's, one random line from
  *   that intensity's list is shown (an empty list = no hint).
- * - WaveEnd(i) / WaveAt(time) / SpawnSeconds(i) are helpers for the run director and the inspector.
+ * - WaveEnd(i) / WaveAt(time) are helpers for the run director and the inspector.
  */
 
 using System;
@@ -30,18 +33,50 @@ public class RunTimeline : ScriptableObject
         public string name = "Wave";
         [Tooltip("Seconds into the run when this wave starts. It lasts until the next wave starts.")]
         [Min(0f)] public float startTime;
-        [Tooltip("How many enemies this wave spawns in total. Any not spawned when the wave ends are dropped.")]
-        [Min(0)] public int budget = 20;
-        [Tooltip("Enemies per second while the budget lasts.")]
-        [Min(0.01f)] public float spawnRate = 1f;
-        [Tooltip("Share of the player's dark spawns that are ranged hunters (ranged never come from the base share).")]
-        [Range(0f, 1f)] public float rangedChance = 0.2f;
-        [Tooltip("Armor mix for basic rats, as weights: element 0 = bare, 1 = one armor layer (helmet), 2 = two (plate), ... Empty = all bare.")]
-        public float[] armorWeights = new float[0];
-        [Tooltip("Share of base-bound spawns that are bag rats (big, slow, spill rats when they die).")]
-        [Range(0f, 1f)] public float bagChance;
         [Tooltip("Picks the hint text only; it doesn't change spawning.")]
         public WaveIntensity intensity = WaveIntensity.Steady;
+
+        [Header("Director card")]
+        [Tooltip("Threat to spend this wave (SpawnPrices costs).")]
+        [Min(0f)] public float threatBudget = 20f;
+        [Tooltip("The budget is rolled within +- this share (0.15 = +-15%).")]
+        [Range(0f, 0.5f)] public float budgetVariance = 0.15f;
+        [Tooltip("What the director may buy, with weights (bigger = picked more often).")]
+        public MenuItem[] menu = new MenuItem[0];
+        [Tooltip("Chance that each purchase is a shadow version (costs more).")]
+        [Range(0f, 1f)] public float shadowChance;
+        [Tooltip("Always bought first, even past the budget.")]
+        public MustInclude[] mustInclude = new MustInclude[0];
+        [Tooltip("At least this much threat is bought as shadows (from the menu).")]
+        [Min(0f)] public float minShadowThreat;
+        [Tooltip("Most rats (swarms: packs) of a type this wave.")]
+        public Limit[] limits = new Limit[0];
+        [Tooltip("How many directions (min, max) the base-bound packs come from.")]
+        public Vector2Int fronts = new Vector2Int(1, 1);
+        [Tooltip("Packs are released over this share of the wave's length (the rest is a quiet tail).")]
+        [Range(0.1f, 1f)] public float releaseSpan = 0.8f;
+    }
+
+    [Serializable]
+    public class MenuItem
+    {
+        public RatType type;
+        [Min(0f)] public float weight = 1f;
+    }
+
+    [Serializable]
+    public class MustInclude
+    {
+        public RatType type;
+        [Min(1)] public int count = 1;
+        public bool shadow;
+    }
+
+    [Serializable]
+    public class Limit
+    {
+        public RatType type;
+        [Min(0)] public int max = 1;
     }
 
     [Serializable]
@@ -56,9 +91,12 @@ public class RunTimeline : ScriptableObject
     [SerializeField, Min(1f)] private float runLength = 300f;
     [Tooltip("Seconds before a wave of a different intensity that its hint appears.")]
     [SerializeField, Min(0f)] private float hintLeadTime = 10f;
+    [Tooltip("The spawn director's price list (threat cost of each rat type).")]
+    [SerializeField] private SpawnPrices prices;
     [SerializeField] private Wave[] waves = new Wave[0];
     [SerializeField] private HintLines[] hints = new HintLines[0];
 
+    public SpawnPrices Prices => prices;
     public float RunLength => runLength;
     public float HintLeadTime => hintLeadTime;
     public int WaveCount => waves != null ? waves.Length : 0;
@@ -82,41 +120,6 @@ public class RunTimeline : ScriptableObject
             }
         }
         return found;
-    }
-
-    /// <summary>Seconds wave `index` needs to spawn its whole budget at its rate.</summary>
-    public float SpawnSeconds(int index)
-    {
-        Wave wave = waves[index];
-        return wave.spawnRate > 0f ? wave.budget / wave.spawnRate : float.PositiveInfinity;
-    }
-
-    /// <summary>Rolls a wave's armor mix: how many armor layers (0 = bare) one basic rat gets.</summary>
-    public static int PickArmor(Wave wave)
-    {
-        if (wave == null || wave.armorWeights == null || wave.armorWeights.Length == 0)
-        {
-            return 0;
-        }
-        float total = 0f;
-        for (int i = 0; i < wave.armorWeights.Length; i++)
-        {
-            total += Mathf.Max(0f, wave.armorWeights[i]);
-        }
-        if (total <= 0f)
-        {
-            return 0;
-        }
-        float roll = UnityEngine.Random.value * total;
-        for (int i = 0; i < wave.armorWeights.Length; i++)
-        {
-            roll -= Mathf.Max(0f, wave.armorWeights[i]);
-            if (roll < 0f)
-            {
-                return i;
-            }
-        }
-        return wave.armorWeights.Length - 1;
     }
 
     /// <summary>A random hint line for an intensity, or null if it has none.</summary>

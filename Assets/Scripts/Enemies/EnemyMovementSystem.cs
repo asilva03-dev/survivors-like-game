@@ -37,6 +37,8 @@
  * - Runners (2026-11-21, athletic rat: EnemyStats.JumpsWalls, user: "literally beeline it to the base"): no flow field
  *   and no wall push-out; they seek straight at their target (map routes still take them around cliffs) and run over
  *   walls and build strips alike (WallHop + RatRunCycle show the vault over each fence).
+ * - Slows / stun (2026-11-23, Optics upgrades): the move speed (and the swarm pull's cap) is multiplied by
+ *   Enemy.SpeedMultiplier (0 while stunned: only pushes move it).
  * - Swarms (2026-11-21, rat swarm): an enemy's EnemyStats.SpacingScale shrinks its separation radius and min spacing
  *   (a pair uses the average of both scales), so tiny mice pack tightly. A swarm member (Enemy.Swarm) that strays past
  *   its group's Slack from the group's Centre is pulled back toward it (the stray distance x SwarmCohesion, at most
@@ -479,7 +481,7 @@ public class EnemyMovementSystem : MonoBehaviour
 
             if (!enemy.IsKnockedBack && enemy.WantsToMove && distance > stops[i] && dt > 0f)
             {
-                float moveSpeed = enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed;
+                float moveSpeed = (enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed) * enemy.SpeedMultiplier;
                 float speed = Mathf.Min(moveSpeed, (distance - stops[i]) / dt);
                 Vector2 direction = toTarget / distance;
                 bool routed = false;
@@ -515,7 +517,7 @@ public class EnemyMovementSystem : MonoBehaviour
                 float stray = toCentre.magnitude - swarm.Slack;
                 if (stray > 0f)
                 {
-                    float memberSpeed = enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed;
+                    float memberSpeed = (enemy.Stats != null ? enemy.Stats.MoveSpeed : settings.MoveSpeed) * enemy.SpeedMultiplier;
                     seek += toCentre.normalized * Mathf.Min(stray * swarm.Cohesion, memberSpeed * pullLimit);
                 }
             }

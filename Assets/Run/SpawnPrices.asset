@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 054960b4fe36f994f978b3567542874b, type: 3}
+  m_Name: SpawnPrices
+  m_EditorClassIdentifier: Assembly-CSharp::SpawnPrices
+  prices:
+  - type: 0
+    cost: 1
+    pack: {x: 3, y: 5}
+    side: 0
+  - type: 1
+    cost: 2
+    pack: {x: 2, y: 4}
+    side: 0
+  - type: 2
+    cost: 3
+    pack: {x: 2, y: 3}
+    side: 0
+  - type: 3
+    cost: 2
+    pack: {x: 1, y: 2}
+    side: 2
+  - type: 4
+    cost: 25
+    pack: {x: 1, y: 1}
+    side: 1
+  - type: 5
+    cost: 6
+    pack: {x: 1, y: 1}
+    side: 0
+  - type: 6
+    cost: 2
+    pack: {x: 1, y: 2}
+    side: 1
+  - type: 7
+    cost: 8
+    pack: {x: 1, y: 1}
+    side: 0
+  shadowMultiplier: 1.5

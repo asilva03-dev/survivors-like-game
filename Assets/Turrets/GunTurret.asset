@@ -16,6 +16,7 @@ MonoBehaviour:
   prefab: {fileID: 7708520752415094553, guid: 1e2139e98c50e6a48a016a95923425c7, type: 3}
   woodCost: 15
   spacingRadius: 1
+  sellRefundShare: 0.5
   idleScanAngle: 40
   idleScanPeriod: 4
   paths:
@@ -24,15 +25,21 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 7683d50dcec7c874ca57f8c155b9df56, type: 2}
     - {fileID: 11400000, guid: 339658801481c244ea4f44c8249791dc, type: 2}
     - {fileID: 11400000, guid: 7e140a9b2d4123c428814663ca00e4d0, type: 2}
+    - {fileID: 11400000, guid: 9d2b27b011ef1d3458fe34f9bf2b2362, type: 2}
+    - {fileID: 11400000, guid: 218db247f537c14438347bf885c822ed, type: 2}
   - name: Fire Rate
     tiers:
     - {fileID: 11400000, guid: ecd8f6a5eb3421d4ab7f88c3084acfb6, type: 2}
     - {fileID: 11400000, guid: baea71dc582a01a468e1a89b331619c2, type: 2}
     - {fileID: 11400000, guid: f1246143e75c22944b174db6a639e8b3, type: 2}
+    - {fileID: 11400000, guid: d75c45df72181be47b2fe5373c636a1a, type: 2}
+    - {fileID: 11400000, guid: f8380aca04a291543b5e357700d40825, type: 2}
   - name: Optics
     tiers:
     - {fileID: 11400000, guid: 6e40c9afe3724b9458bf5dc92abb985a, type: 2}
     - {fileID: 11400000, guid: 9b3adb80207c706458ae41038e4c275a, type: 2}
     - {fileID: 11400000, guid: e6a5a73f8faf3ae4996e4db25a1cf637, type: 2}
-  mainPathMaxTier: 3
-  secondPathMaxTier: 1
+    - {fileID: 11400000, guid: 6c3dd181b0706e84ea49dae1e92c1d16, type: 2}
+    - {fileID: 11400000, guid: 9fd1701e429517847b37e6106efcf3a6, type: 2}
+  mainPathMaxTier: 5
+  secondPathMaxTier: 2

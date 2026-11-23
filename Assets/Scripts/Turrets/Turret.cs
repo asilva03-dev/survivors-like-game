@@ -13,9 +13,13 @@
  *   Static event ActiveChanged fires when a turret is placed or removed.
  * - Upgrades (slice 6 step 5): Tier(path), NextUpgrade(path), CanUpgrade(path, out reason) (the Bloons rule from the
  *   definition: one path to MainPathMaxTier, one other to SecondPathMaxTier, the third 0; reasons "Max tier" /
- *   "Path locked"), TryUpgrade(path, inventory, out reason) spends the tier's wood. After an upgrade the gun gets
+ *   "Path locked"; 2026-11-22: a tier whose effect isn't built yet (TurretUpgrade.EffectBuilt off) is refused with
+ *   "Not built yet"), TryUpgrade(path, inventory, out reason) spends the tier's wood. After an upgrade the gun gets
  *   this turret's own copy of the base stats with every bought tier applied (the shared asset is never changed).
  *   TotalSpent = build cost + upgrades. Event Upgraded.
+ *   Body model (2026-11-23): bodyModel = the turning body's MeshFilter (Gun > TurretBody); after an upgrade it shows the
+ *   BodyMesh of the last bought tier (path by path, tier by tier) that has one, else the prefab's own mesh (Double
+ *   Barreled swaps in the twin-barrel body).
  * - Selling (slice 6 step 7): SellValue = definition.SellRefundShare (0.5) x TotalSpent, rounded down; Sell(inventory)
  *   refunds it and removes the turret.
  */
@@ -35,6 +39,8 @@ public class Turret : MonoBehaviour
 
     [SerializeField] private TurretDefinition definition;
     [SerializeField] private TurretGun gun;
+    [Tooltip("The turning body's MeshFilter; upgrade tiers with a Body Mesh swap its mesh.")]
+    [SerializeField] private MeshFilter bodyModel;
 
     public TurretDefinition Definition => definition;
     public Vector2Int Cell { get; private set; }
@@ -45,10 +51,12 @@ public class Turret : MonoBehaviour
 
     public const string MaxTierReason = "Max tier";
     public const string LockedReason = "Path locked";
+    public const string NotBuiltReason = "Not built yet";
 
     private int[] tiers = new int[0];
     private GunStats baseStats;
     private GunStats upgradedStats;
+    private Mesh baseBodyMesh;
 
     // Raised after an upgrade is bought (the panel refreshes).
     public event System.Action Upgraded;
@@ -127,6 +135,11 @@ public class Turret : MonoBehaviour
             reason = LockedReason;
             return false;
         }
+        if (!NextUpgrade(path).EffectBuilt)
+        {
+            reason = NotBuiltReason;
+            return false;
+        }
 
         reason = null;
         return true;
@@ -168,14 +181,24 @@ public class Turret : MonoBehaviour
 
         upgradedStats = Instantiate(baseStats);
         upgradedStats.name = baseStats.name + " (" + name + ")";
+        Mesh body = baseBodyMesh;
         for (int path = 0; path < tiers.Length; path++)
         {
             for (int tier = 0; tier < tiers[path]; tier++)
             {
-                definition.Paths[path].tiers[tier].ApplyTo(upgradedStats);
+                TurretUpgrade upgrade = definition.Paths[path].tiers[tier];
+                upgrade.ApplyTo(upgradedStats);
+                if (upgrade.BodyMesh != null)
+                {
+                    body = upgrade.BodyMesh;
+                }
             }
         }
         gun.UseStats(upgradedStats);
+        if (bodyModel != null && body != null)
+        {
+            bodyModel.sharedMesh = body;
+        }
     }
 
     public void Init(TurretDefinition turretDefinition, Vector2Int cell)
@@ -270,6 +293,7 @@ public class Turret : MonoBehaviour
             gun = GetComponentInChildren<TurretGun>();
         }
         baseStats = gun != null ? gun.CurrentStats : null;
+        baseBodyMesh = bodyModel != null ? bodyModel.sharedMesh : null;
     }
 
     private void OnDestroy()

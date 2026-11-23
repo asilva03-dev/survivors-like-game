@@ -12,12 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
   m_Name: Gun_P2_T1
   m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
-  upgradeName: Greased Gears
-  description: Fires 25% faster.
+  upgradeName: Trigger Finger
+  description: Shoots faster.
   woodCost: 20
+  effectBuilt: 1
   damageAdd: 0
   fireRateMultiplier: 1.25
   rangeAdd: 0
   pierceAdd: 0
   projectilesAdd: 0
   enableHoming: 0
+  rangeMultiplier: 1
+  grantsShadowDetection: 0

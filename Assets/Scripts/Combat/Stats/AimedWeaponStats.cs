@@ -85,6 +85,12 @@ public abstract class AimedWeaponStats : WeaponStats
     {
         range = Mathf.Max(0.1f, range + amount);
     }
+
+    // Runtime change for upgrade copies only (turret upgrades, 2026-11-22): 1.25 = 25% more range.
+    public void ScaleRange(float multiplier)
+    {
+        range = Mathf.Max(0.1f, range * multiplier);
+    }
     public float SlotClearance => slotClearance;
     public float RingRadius => ringRadius;
     public float TurnSpeed => turnSpeed;

@@ -26,6 +26,10 @@
  *   - Base-assigned: the closest base (flow field), except while the player is within the stats' playerAggroRadius
  *     (released AggroRelease units further out, so it doesn't flicker).
  *   - No base: the player; no player: the closest base.
+ *   - Player on a structure (2026-11-22, user: "don't track the player if they are on top of a fence or the box even
+ *     if the player is close"): while PlayerController.OnStructure, a non-hunter never aggros on the player and a
+ *     player-assigned one goes for the closest base instead (its assignment is kept, so it hunts again once the player
+ *     steps down). Hunters are unchanged (fences and the box are in the light, where they already back off).
  * - Contact damage: an enemy within its stats' contactRange of its target's edge hurts it, at most once per
  *   contactInterval (see EnemyStats), except a player whose feet are out of bite reach of this enemy's feet (jumping,
  *   on a wall top, or above/below it across a cliff: PlayerController.OutOfBiteReachFrom, measured from FeetY = the
@@ -41,6 +45,13 @@
  *   weapon hits without HitFlags.Lead through Damageable.BlocksHit).
  * - Swarm (2026-11-21): the RatSwarms group this enemy belongs to (null for every other enemy; cleared on enable,
  *   set by RatSwarms right after spawning); EnemyMovementSystem pulls members toward the group's centre.
+ * - Slow / stun (2026-11-23, gun turret Optics T3-T5): AddSlowStack(perStack, maxStacks, duration, stunDuration,
+ *   stunImmunity) adds one stack (up to maxStacks; the strongest perStack seen is kept); all stacks drop together
+ *   `duration` seconds after the last one. SpeedMultiplier = 1 - stacks x perStack (min 0.1), 0 while stunned
+ *   (EnemyMovementSystem multiplies the move speed by it). With stunDuration > 0, reaching maxStacks stuns the enemy for
+ *   stunDuration (stacks cleared), then it can't be stunned again for stunImmunity seconds; an enemy whose stats are
+ *   StunImmune (bag rat) is never stunned and just stays at the full stack. A stunned enemy doesn't bite
+ *   or dive. All reset on enable (pooling).
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -82,6 +93,10 @@ public class Enemy : Damageable
     private float knockRemaining;
     private float contactCooldown;
     private bool aggroed;
+    private float slowPerStack;
+    private float slowTimer;
+    private float stunTimer;
+    private float stunImmuneTimer;
     private HunterState hunterState;
     private float lingerTimer;
 
@@ -100,6 +115,35 @@ public class Enemy : Damageable
     public bool IsLingering => hunterState == HunterState.Linger;
     public bool IsRetreating => hunterState == HunterState.Retreat;
     public bool IsKnockedBack => knockRemaining > 0f;
+    /// <summary>Slow stacks on this enemy (Optics upgrades); 0 = not slowed.</summary>
+    public int SlowStacks { get; private set; }
+    public bool IsStunned => stunTimer > 0f;
+    /// <summary>Move speed multiplier from slows / stun (1 = normal, 0 = stunned).</summary>
+    public float SpeedMultiplier => IsStunned ? 0f : Mathf.Max(0.1f, 1f - SlowStacks * slowPerStack);
+
+    /// <summary>Adds one slow stack (see the header). Returns false when it couldn't (dead/disabled).</summary>
+    public bool AddSlowStack(float perStack, int maxStacks, float duration, float stunDuration, float stunImmunity)
+    {
+        if (!isActiveAndEnabled || Health <= 0f || maxStacks <= 0)
+        {
+            return false;
+        }
+        slowPerStack = Mathf.Max(slowPerStack, perStack);
+        slowTimer = duration;
+        if (IsStunned)
+        {
+            return true;
+        }
+        SlowStacks = Mathf.Min(maxStacks, SlowStacks + 1);
+        bool canStun = stats == null || !stats.StunImmune;
+        if (canStun && stunDuration > 0f && SlowStacks >= maxStacks && stunImmuneTimer <= 0f)
+        {
+            stunTimer = stunDuration;
+            stunImmuneTimer = stunDuration + stunImmunity;
+            SlowStacks = 0;
+        }
+        return true;
+    }
     public Transform Visual => visual;
     public EnemyStats Stats => stats;
     public virtual bool WantsToMove => true;
@@ -185,6 +229,11 @@ public class Enemy : Damageable
         FallSpeed = 0f;
         contactCooldown = 0f;
         aggroed = false;
+        SlowStacks = 0;
+        slowPerStack = 0f;
+        slowTimer = 0f;
+        stunTimer = 0f;
+        stunImmuneTimer = 0f;
         hunterState = HunterState.Hunt;
         HasMoveGoal = false;
         Assignment = IsHunter ? EnemyAssignment.Player : EnemyAssignment.Base;
@@ -193,8 +242,34 @@ public class Enemy : Damageable
 
     protected virtual void Update()
     {
+        TickStatus();
         RefreshTarget();
-        TryContactDamage();
+        if (!IsStunned)
+        {
+            TryContactDamage();
+        }
+    }
+
+    private void TickStatus()
+    {
+        float dt = Time.deltaTime;
+        if (stunTimer > 0f)
+        {
+            stunTimer -= dt;
+        }
+        if (stunImmuneTimer > 0f)
+        {
+            stunImmuneTimer -= dt;
+        }
+        if (SlowStacks > 0)
+        {
+            slowTimer -= dt;
+            if (slowTimer <= 0f)
+            {
+                SlowStacks = 0;
+                slowPerStack = 0f;
+            }
+        }
     }
 
     // The light rule (see the header).
@@ -217,14 +292,15 @@ public class Enemy : Damageable
             Assignment = EnemyAssignment.Base;
         }
 
+        bool playerPerched = PlayerController.Instance != null && PlayerController.Instance.OnStructure;
         if (closestBase == null || (Assignment == EnemyAssignment.Player && player != null))
         {
             aggroed = false;
-            Target = player != null ? player : closestBase;
+            Target = player != null && (!playerPerched || closestBase == null) ? player : closestBase;
             return;
         }
 
-        if (player != null && stats != null)
+        if (player != null && stats != null && !playerPerched)
         {
             float reach = stats.PlayerAggroRadius + (aggroed ? AggroRelease : 0f);
             Vector3 offset = player.transform.position - position;

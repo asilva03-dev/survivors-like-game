@@ -12,12 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
   m_Name: Gun_P2_T2
   m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
-  upgradeName: Double Barrel
-  description: Fires 2 bullets per shot.
+  upgradeName: Greased Gears
+  description: Shoots even faster.
   woodCost: 30
+  effectBuilt: 1
   damageAdd: 0
-  fireRateMultiplier: 1
+  fireRateMultiplier: 1.3
   rangeAdd: 0
   pierceAdd: 0
-  projectilesAdd: 1
+  projectilesAdd: 0
   enableHoming: 0
+  rangeMultiplier: 1
+  grantsShadowDetection: 0

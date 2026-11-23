@@ -714,6 +714,9 @@ MonoBehaviour:
   mapHalfSize: 83
   mapEdgeMargin: 2
   offscreenPushStep: 1
+  packSpread: 0.8
+  frontJitter: 15
+  frontAttempts: 8
 --- !u!4 &147156300
 Transform:
   m_ObjectHideFlags: 0
@@ -721,6 +724,76 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 147156298}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &149751046
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 149751048}
+  - component: {fileID: 149751047}
+  m_Layer: 0
+  m_Name: StatusLook
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &149751047
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 149751046}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e995b281f7271f429cb80bd5f7e15d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyStatusLook
+  mistMaterial: {fileID: 2100000, guid: 8ff2c2f90573b8741bed4be378bfbd5f, type: 2}
+  mistColor: {r: 1, g: 0.55, b: 0.82, a: 1}
+  mistPerStack: 6
+  mistSize: 0.4
+  mistSizePerStack: 0.1
+  mistAlpha: 0.2
+  mistAlphaPerStack: 0.06
+  mistLifetime: 0.9
+  mistSpread: 0.35
+  spreadPuffs: 4
+  spreadColor: {r: 1, g: 0.4, b: 0.75, a: 1}
+  spreadTravelTime: 0.3
+  spreadBurst: 6
+  burstPuffs: 32
+  burstTime: 0.3
+  burstColor: {r: 1, g: 0.5, b: 0.8, a: 1}
+  burstAlpha: 0.45
+  edgePuffs: 34
+  burstSize: 1.6
+  edgeLifetime: 0.6
+  starCount: 3
+  starColor: {r: 1, g: 0.88, b: 0.2, a: 1}
+  starSize: 0.32
+  starRingRadius: 0.32
+  starHeight: 0.25
+  starSpin: 300
+--- !u!4 &149751048
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 149751046}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -2496,6 +2569,9 @@ MonoBehaviour:
   timeline: {fileID: 11400000, guid: 269447a5e50155942a4d2f1c832f02cd, type: 2}
   spawner: {fileID: 147156299}
   layout: {fileID: 1558303616}
+  darkRetry: 3
+  refundDelay: 1
+  frontWobble: 0.3
 --- !u!4 &819754572
 Transform:
   m_ObjectHideFlags: 0
@@ -3315,7 +3391,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugWood
   key: 21
-  amount: 50
+  amount: 500
   enableInBuilds: 1
   inventory: {fileID: 239444412}
 --- !u!4 &1163108118
@@ -3518,6 +3594,76 @@ MonoBehaviour:
   panelSize: {x: 640, y: 340}
   titleSize: 52
   textSize: 30
+--- !u!1 &1316430543
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1316430545}
+  - component: {fileID: 1316430544}
+  m_Layer: 0
+  m_Name: BulletBlasts
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1316430544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1316430543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20c8ed223cb25b242a1fe047c572414a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BulletBlasts
+  shrapnelPrefab: {fileID: 962566158592359736, guid: bc85c3b6d43932c4aacf34d196f642c1, type: 3}
+  shrapnelStats: {fileID: 11400000, guid: 65ef0a31bc6663c41b8c97d89be282ba, type: 2}
+  shrapnelPrewarm: 24
+  shrapnelSeekRadius: 4
+  puffMaterial: {fileID: 2100000, guid: bab4cc1740c9fe54588b0b8069df4cf6, type: 2}
+  flashCount: 16
+  smokeCount: 14
+  flashColor: {r: 1, g: 0.72, b: 0.25, a: 1}
+  flashColorHot: {r: 1, g: 0.93, b: 0.55, a: 1}
+  smokeColor: {r: 0.58, g: 0.56, b: 0.53, a: 1}
+  puffScale: 0.5
+  coreSize: 1.3
+  flashSpeed: {x: 3.5, y: 6.5}
+  fireColor: {r: 1, g: 0.55, b: 0.25, a: 1}
+  ashColor: {r: 0.45, g: 0.42, b: 0.4, a: 1}
+  sparkCount: 24
+  sparkSpeed: {x: 7, y: 13}
+  sparkLifetime: {x: 0.25, y: 0.45}
+  sparkSize: {x: 0.11, y: 0.17}
+  sparkGravity: 1.5
+  sparkColorHot: {r: 1, g: 1, b: 0.75, a: 1}
+  sparkColor: {r: 1, g: 0.85, b: 0.15, a: 1}
+  smokeLifetime: {x: 0.45, y: 0.7}
+  smokeSize: {x: 0.9, y: 1.5}
+  smokeSpread: 1.2
+  smokeRise: {x: 0.3, y: 0.7}
+--- !u!4 &1316430545
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1316430543}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1383610839
 GameObject:
   m_ObjectHideFlags: 0
@@ -4621,6 +4767,7 @@ MonoBehaviour:
     m_Bits: 513
   groundCheckDistance: 0.08
   biteClearHeight: 0.5
+  structureLayer: Wall
   moveAction:
     m_Name: Move
     m_Type: 0
@@ -5339,3 +5486,5 @@ SceneRoots:
   - {fileID: 819754572}
   - {fileID: 384386730}
   - {fileID: 1066408248}
+  - {fileID: 1316430545}
+  - {fileID: 149751048}

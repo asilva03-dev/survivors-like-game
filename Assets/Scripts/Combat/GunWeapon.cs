@@ -84,6 +84,6 @@ public class GunWeapon : AimedWeapon<GunStats>
         projectile.Launch(pool, direction, Stats.ProjectileSpeed, Stats, Stats.Lifetime, Owner,
             settleDirection, Stats.CurveTurnSpeed,
             Stats.Homing ? target : null, Stats.Homing ? Stats.HomingTurnSpeed : 0f, retarget,
-            Stats.Pierce);
+            Stats.Pierce, Stats.HomingRadius);
     }
 }

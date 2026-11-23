@@ -12,12 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
   m_Name: Gun_P1_T3
   m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
-  upgradeName: Depleted Core
-  description: +4 damage and pierce 1 more enemy.
+  upgradeName: Sometimes Explosive Bullets
+  description: Bullets sometimes explode on hit, damaging a few nearby rats. Explosions
+    can break pots.
   woodCost: 45
-  damageAdd: 4
+  effectBuilt: 1
+  damageAdd: 0
   fireRateMultiplier: 1
   rangeAdd: 0
-  pierceAdd: 1
+  pierceAdd: 0
   projectilesAdd: 0
   enableHoming: 0
+  rangeMultiplier: 1
+  grantsShadowDetection: 0
+  explosionChance: 0.33
+  explosionTargets: 3
+  explosionDamage: 10
+  explosionRadius: 2
+  shrapnelCount: 0

@@ -12,12 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
   m_Name: Gun_P3_T1
   m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
-  upgradeName: Long Barrel
-  description: +2 range.
+  upgradeName: Longer Range
+  description: Shoots from farther away.
   woodCost: 20
+  effectBuilt: 1
   damageAdd: 0
   fireRateMultiplier: 1
-  rangeAdd: 2
+  rangeAdd: 0
   pierceAdd: 0
   projectilesAdd: 0
   enableHoming: 0
+  rangeMultiplier: 1.25
+  grantsShadowDetection: 0

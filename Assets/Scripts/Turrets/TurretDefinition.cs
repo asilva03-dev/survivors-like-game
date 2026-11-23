@@ -11,7 +11,8 @@
  * - Idle scan: with no enemy in range the gun sweeps idleScanAngle degrees to each side of its rest direction
  *   (toward the nearest path cell), one full left-right-left cycle every idleScanPeriod seconds.
  * - Upgrades (Bloons-style, slice 6 step 5): `paths` (3), each a name and its tiers (TurretUpgrade assets, bought in
- *   order). One path may go up to mainPathMaxTier (3), one other path up to secondPathMaxTier (1), the third stays 0.
+ *   order). One path may go up to mainPathMaxTier, one other path up to secondPathMaxTier, the third stays 0 (gun
+ *   turret since 2026-11-22: 5 tiers per path, the 5/2 rule).
  *   Turret applies the rule and the stat changes.
  */
 

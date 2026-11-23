@@ -1,8 +1,10 @@
 /*
  * RunDebugUI
  * Testing aids for the run (round system step 3, 2026-11-05): a small debug line on the HUD (current wave and its
- * intensity, budget left (+ despawn refunds this wave), spawn rate, alive enemies split base-bound / coming for the
- * player, the dark-spawn share)
+ * intensity, rats still queued (+ despawn refunds this wave) and the rolled threat spent / budget (spawn director step 2,
+ * 2026-11-21), alive enemies split base-bound / coming for the player, the dark-spawn share; a second line (spawn
+ * director step 4, 2026-11-22) with the seconds to the next pack, what is still queued by type and the wave's fronts as
+ * compass directions around the light, N = +Z = up on screen)
  * and a key (N by default) that skips to the next wave (RunDirector.SkipToNextWave; the current wave's unspawned
  * budget is dropped; after the last wave it jumps to the run's end).
  *
@@ -77,7 +79,28 @@ public class RunDebugUI : MonoBehaviour
             return "Before the first wave · " + alive + " · " + share;
         }
         string refunds = director.RefundedThisWave > 0 ? string.Format(" (+{0} refunded)", director.RefundedThisWave) : "";
-        return string.Format("W{0} {1} · budget {2} left{3} · {4}/s · {5} · {6}",
-            director.WaveIndex + 1, wave.intensity, director.BudgetLeft, refunds, wave.spawnRate, alive, share);
+        string line = string.Format("W{0} {1} · {2} queued{3} · threat {4:0}/{5:0} · {6} · {7}",
+            director.WaveIndex + 1, wave.intensity, director.QueuedRats, refunds, director.ThreatSpent, director.ThreatBudget,
+            alive, share);
+        float next = director.NextReleaseIn;
+        string queued = director.DescribeQueue();
+        string nextPack = next < 0f ? "all released" : string.Format("next pack {0:0}s", next);
+        return line + "\n" + nextPack + (queued.Length > 0 ? " · " + queued : "") + " · fronts " + Fronts();
+    }
+
+    private string Fronts()
+    {
+        if (director.Fronts.Count == 0)
+        {
+            return "none";
+        }
+        string[] names = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+        string text = "";
+        for (int i = 0; i < director.Fronts.Count; i++)
+        {
+            int index = Mathf.RoundToInt(Mathf.Repeat(director.Fronts[i], 360f) / 45f) % 8;
+            text += (i > 0 ? ", " : "") + names[index];
+        }
+        return text;
     }
 }

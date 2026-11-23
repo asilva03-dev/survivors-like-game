@@ -8,8 +8,9 @@
  *   it is cleared (right click, picking a defense from the bar, closing build mode).
  * - Shows the turret's name, its picture (DefensePreview.Cached) and one row per upgrade path: an upgrade button
  *   (">", with tier pips under it: filled = bought) and a description box (path name, next upgrade's name and wood
- *   cost, its description). A maxed path reads "Maxed", a path blocked by the 3/1 rule reads "Path locked"; both
- *   grey out their button. An unaffordable upgrade dims its button and shows the cost in red.
+ *   cost, its description). A maxed path reads "Maxed", a path blocked by the tier rule (5/2 for the gun turret since
+ *   2026-11-22) reads "Path locked"; a tier whose effect isn't built yet shows its name and description with "Not built
+ *   yet" in place of the cost; all three grey out their button. Up to 5 tier pips per path. An unaffordable upgrade dims its button and shows the cost in red.
  * - Sell button at the bottom (step 7): "Sell (+N wood)" with the turret's SellValue (50% of everything spent on it);
  *   clicking it refunds the wood, removes the turret and closes the panel (BuildMode.SellSelected).
  * - Clicking a button buys the next tier (Turret.TryUpgrade); a refusal shows the reason as a red shaking message.
@@ -57,7 +58,7 @@ public class UpgradePanelUI : MonoBehaviour
     [SerializeField] private Color labelColor = new Color(0.7f, 0.72f, 0.78f);
     [SerializeField] private Color sellColor = new Color(0.62f, 0.22f, 0.2f, 1f);
 
-    private const int MaxPips = 3;
+    private const int MaxPips = 5;
 
     private readonly List<Row> rows = new List<Row>();
     private BuildModeUI ui;
@@ -222,6 +223,16 @@ public class UpgradePanelUI : MonoBehaviour
             string reason;
             bool canUpgrade = shownTurret.CanUpgrade(path, out reason);
             TurretUpgrade next = shownTurret.NextUpgrade(path);
+            if (!canUpgrade && reason == Turret.NotBuiltReason && next != null)
+            {
+                row.upgradeName.text = next.UpgradeName;
+                row.cost.text = reason;
+                row.cost.color = labelColor;
+                row.description.text = next.Description;
+                row.button.color = lockedButtonColor;
+                row.arrow.text = "-";
+                continue;
+            }
             if (!canUpgrade)
             {
                 bool maxed = next == null;
@@ -300,8 +311,8 @@ public class UpgradePanelUI : MonoBehaviour
             row.pips = new Image[MaxPips];
             for (int i = 0; i < MaxPips; i++)
             {
-                RectTransform pip = CreateBox(button, "Pip" + i, new Vector2(14f, 14f) * k, pipOffColor, Mathf.RoundToInt(3 * k));
-                Place(pip, new Vector2(0.5f, 0f), new Vector2((i - (MaxPips - 1) * 0.5f) * 20f * k, 16f * k), pip.sizeDelta);
+                RectTransform pip = CreateBox(button, "Pip" + i, new Vector2(12f, 12f) * k, pipOffColor, Mathf.RoundToInt(3 * k));
+                Place(pip, new Vector2(0.5f, 0f), new Vector2((i - (MaxPips - 1) * 0.5f) * 16f * k, 15f * k), pip.sizeDelta);
                 pip.GetComponent<Image>().raycastTarget = false;
                 row.pips[i] = pip.GetComponent<Image>();
             }

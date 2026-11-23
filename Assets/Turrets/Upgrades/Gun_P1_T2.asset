@@ -12,12 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
   m_Name: Gun_P1_T2
   m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
-  upgradeName: Armor Piercing
-  description: Bullets pass through 1 extra enemy.
+  upgradeName: Powerful Bullets
+  description: Bullets deal even more damage.
   woodCost: 30
-  damageAdd: 0
+  effectBuilt: 1
+  damageAdd: 10
   fireRateMultiplier: 1
   rangeAdd: 0
-  pierceAdd: 1
+  pierceAdd: 0
   projectilesAdd: 0
   enableHoming: 0
+  rangeMultiplier: 1
+  grantsShadowDetection: 0

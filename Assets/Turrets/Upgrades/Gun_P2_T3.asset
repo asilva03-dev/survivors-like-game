@@ -12,12 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
   m_Name: Gun_P2_T3
   m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
-  upgradeName: Spin-Up Motor
-  description: Fires 50% faster.
+  upgradeName: Double Barreled
+  description: Shoots two bullets at once.
   woodCost: 45
+  effectBuilt: 1
   damageAdd: 0
-  fireRateMultiplier: 1.5
+  fireRateMultiplier: 1
   rangeAdd: 0
   pierceAdd: 0
-  projectilesAdd: 0
+  projectilesAdd: 1
   enableHoming: 0
+  rangeMultiplier: 1
+  grantsShadowDetection: 0
+  bodyMesh: {fileID: 4300000, guid: dba85174f7b4a414f96de3dcea11fee7, type: 2}
+  explosionChance: 0
+  explosionTargets: 3
+  explosionDamage: 10
+  explosionRadius: 2
+  shrapnelCount: 0

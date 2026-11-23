@@ -20,6 +20,8 @@
  *   gets (Enemy.SetExtraLayers); damage strips layers from the top and carries through them (20 damage = 2 layers),
  *   and the enemy dies when the bare layer is emptied. Empty list = plain health (ranged rats).
  * - needsLead (2026-11-21, pots): only weapon hits with the Lead property hurt it (see Damageable.TakeHit).
+ * - stunImmune (2026-11-23, user: bag rats immune like Bloons' big balloons): slows still apply, but a full slow stack never
+ *   stuns it (Enemy.AddSlowStack).
  * - jumpsWalls (2026-11-21, athletic rat): a runner: it beelines straight at its target, ignoring the flow field and the
  *   base walls (EnemyMovementSystem), vaulting each fence on the way (WallHop + RatRunCycle).
  * - Swarm (2026-11-21, rat swarm): spacingScale shrinks this type's share of EnemySettings' separation and min spacing
@@ -73,6 +75,8 @@ public class EnemyStats : ScriptableObject
     [SerializeField] private bool needsLead;
     [Tooltip("Runner: beelines straight to the base, vaulting the walls in the way (athletic rat).")]
     [SerializeField] private bool jumpsWalls;
+    [Tooltip("Can't be stunned (slows still work). Big rats like the bag rat.")]
+    [SerializeField] private bool stunImmune;
 
     [Header("Swarm (rat swarm)")]
     [Tooltip("This type's share of the crowd spacing (EnemySettings separation radius / min spacing). 1 = normal rats, small = packs tightly.")]
@@ -114,6 +118,7 @@ public class EnemyStats : ScriptableObject
     public float BaseHitDamage => baseHitDamage;
     public bool NeedsLead => needsLead;
     public bool JumpsWalls => jumpsWalls;
+    public bool StunImmune => stunImmune;
     public float SpacingScale => spacingScale;
     public int SwarmSize => swarmSize;
     public int SwarmReserve => swarmReserve;
