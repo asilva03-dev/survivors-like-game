@@ -11,8 +11,12 @@
  * - Left click builds through TurretPlacer.TryBuild (spends the wood). The same defense stays selected so more can be
  *   placed; right click unselects (BuildMode). A refused click also shows the reason as a red shaking message.
  * - Ghost material: a tinted instance of `material` (GridDebug.mat, transparent, unlit) on every renderer.
- * - Test hooks: SetTestPoint(world or null) overrides the cursor, Confirm() acts like a left click; Visible, Valid,
- *   Reason, Cell, GhostPosition.
+ * - Rotation (2026-11-23, footprints): for a defense with a footprint (TurretDefinition.Rotatable, the Trapper's L) the
+ *   mouse wheel turns the ghost a quarter turn per notch (up = clockwise); the ghost root turns with it, every tile is
+ *   checked (TurretPlacer.CanBuild with the rotation) and the hint adds "Scroll: rotate". The rotation is kept between
+ *   placements. One-tile defenses ignore the wheel.
+ * - Test hooks: SetTestPoint(world or null) overrides the cursor, Confirm() acts like a left click, Rotate(steps); Visible,
+ *   Valid, Reason, Cell, Rotation, GhostPosition.
  */
 
 using UnityEngine;
@@ -22,6 +26,7 @@ using UnityEngine.InputSystem;
 public class BuildGhost : MonoBehaviour
 {
     public const string Controls = "Left click: build      Right click: cancel";
+    public const string RotateControls = "Left click: build      Scroll: rotate      Right click: cancel";
 
     [SerializeField] private BuildModeUI ui;
     [SerializeField] private Material material;
@@ -51,6 +56,7 @@ public class BuildGhost : MonoBehaviour
     public bool Valid { get; private set; }
     public string Reason { get; private set; }
     public Vector2Int Cell { get; private set; }
+    public int Rotation { get; private set; }
     public Vector3 GhostPosition => root != null ? root.position : Vector3.zero;
 
     private void Awake()
@@ -118,14 +124,29 @@ public class BuildGhost : MonoBehaviour
             Rebuild(defense);
         }
 
+        Mouse mouse = Mouse.current;
+        if (defense.Rotatable && testPoint == null && mouse != null)
+        {
+            float scroll = mouse.scroll.ReadValue().y;
+            if (scroll > 0.01f)
+            {
+                Rotate(1);
+            }
+            else if (scroll < -0.01f)
+            {
+                Rotate(-1);
+            }
+        }
+        int turn = defense.Rotatable ? Rotation : 0;
+
         BuildGrid grid = BuildGrid.Instance;
         Cell = grid != null ? grid.WorldToCell(point) : Vector2Int.zero;
         Vector3 position = grid != null ? grid.CellToWorld(Cell) : new Vector3(point.x, 0f, point.z);
-        root.position = position + Vector3.up * lift;
+        root.SetPositionAndRotation(position + Vector3.up * lift, Quaternion.Euler(0f, turn * 90f, 0f));
         root.gameObject.SetActive(true);
 
         string reason = null;
-        Valid = TurretPlacer.Instance != null && TurretPlacer.Instance.CanBuild(defense, Cell, out reason);
+        Valid = TurretPlacer.Instance != null && TurretPlacer.Instance.CanBuild(defense, Cell, turn, out reason);
         Reason = Valid ? null : reason;
         ghostMaterial.color = Valid ? validColor : invalidColor;
         if (gun != null)
@@ -138,10 +159,9 @@ public class BuildGhost : MonoBehaviour
 
         if (ui != null)
         {
-            ui.ShowHint(Controls, Valid ? "Ready to build (" + defense.WoodCost + " wood)" : Reason, Valid);
+            ui.ShowHint(defense.Rotatable ? RotateControls : Controls, Valid ? "Ready to build (" + defense.WoodCost + " wood)" : Reason, Valid);
         }
 
-        Mouse mouse = Mouse.current;
         if (testPoint == null && mouse != null && mouse.leftButton.wasPressedThisFrame && !PointerOverUI())
         {
             Confirm();
@@ -157,14 +177,15 @@ public class BuildGhost : MonoBehaviour
         }
 
         string reason;
-        if (TurretPlacer.Instance != null && TurretPlacer.Instance.TryBuild(buildMode.Selected, Cell, out reason))
+        int turn = buildMode.Selected.Rotatable ? Rotation : 0;
+        if (TurretPlacer.Instance != null && TurretPlacer.Instance.TryBuild(buildMode.Selected, Cell, turn, out reason))
         {
             return true;
         }
 
         if (ui != null && TurretPlacer.Instance != null)
         {
-            TurretPlacer.Instance.CanBuild(buildMode.Selected, Cell, out reason);
+            TurretPlacer.Instance.CanBuild(buildMode.Selected, Cell, turn, out reason);
             ui.ShowError(reason ?? TurretPlacer.NotEnoughWood);
         }
         return false;
@@ -173,6 +194,12 @@ public class BuildGhost : MonoBehaviour
     public void SetTestPoint(Vector3? world)
     {
         testPoint = world;
+    }
+
+    // Turns the ghost `steps` quarter turns clockwise (seen from above).
+    public void Rotate(int steps)
+    {
+        Rotation = (((Rotation + steps) % 4) + 4) % 4;
     }
 
     private void OnSelectionChanged()

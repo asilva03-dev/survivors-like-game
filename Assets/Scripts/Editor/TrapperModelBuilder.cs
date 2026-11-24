@@ -6,10 +6,19 @@
  *
  * - User's pick (2026-11-23, "B without the held trap"): the round grumpy ginger cat sitting beside a squat wide sack,
  *   paws resting in front, three traps standing up out of the sack in a fan with their bars and cheese facing forward.
- *   Tools > Models > Turret > Build Trapper writes Models/TrapperBody.asset, Models/RatTrapBase.asset and
- *   Models/RatTrapBar.asset in place (prefabs keep their links); materials in Materials/Models/trapper/ (+ the gun turret's
- *   dark and the bag rat's burlap/rope).
- * - Units: world units, feet on y 0, the cat faces +Z. Fits inside one ~1.3 tile.
+ *   Tools > Models > Turret > Build Trapper writes Models/TrapperBody.asset (the cat alone: the part that turns),
+ *   Models/TrapperSack.asset, Models/TrapperPedestal.asset, Models/RatTrapBase.asset and Models/RatTrapBar.asset in place
+ *   (prefabs keep their links); materials in Materials/Models/trapper/ (+ the gun turret's dark and the bag rat's
+ *   burlap/rope; the pedestal uses the fence's FenceCrate / FenceCrateFrame).
+ * - Pedestal = an L over three tiles (user's sketch, 2026-11-23; replaces change 1's one-tile layout), in the turret root's
+ *   space (root = the corner tile's centre; the footprint's rotation turns the root in 90 deg steps):
+ *   corner tile (0, 0): the cat's stack, a crate with a smaller crate on top (top at StackTop 1.5 = fence level);
+ *   tile (SackX 1, 0) beside it: a wide low crate with a smaller crate on it (top at SackCrateTop) and the sack on top;
+ *   tile (0, FrontZ -1) in front (toward the camera at rotation 0): a low wide box.
+ *   Trapper.prefab: Body (the cat, the only part that turns) at (0, StackTop, 0), Sack at (SackX, SackCrateTop, 0).
+ * - Hands (2026-11-23, throw animation): the cat mesh has no paws; Models/TrapperHand.asset is one round paw (world units,
+ *   centred, fur accent) used twice on Trapper.prefab (Body > HandL / HandR), moved by TrapperAnimator.
+ * - Units: world units, feet on y 0, the cat faces +Z.
  * - The sack (user): not too tall, wider to compensate so it still looks full, recognisably a sack (round bulging body,
  *   gathered neck with a rope tie, a folded rim).
  * - Submeshes: 0 fur, 1 fur accent (muzzle, inner ears, paws), 2 dark (eyes, brows, nose, springs), 3 burlap, 4 rope,
@@ -28,11 +37,22 @@ public static class TrapperModelBuilder
     public const string BodyPath = "Assets/Models/TrapperBody.asset";
     public const string TrapBasePath = "Assets/Models/RatTrapBase.asset";
     public const string TrapBarPath = "Assets/Models/RatTrapBar.asset";
+    public const string SackPath = "Assets/Models/TrapperSack.asset";
+    public const string PedestalPath = "Assets/Models/TrapperPedestal.asset";
+    public const string HandPath = "Assets/Models/TrapperHand.asset";
+
+    public const float StackTop = 1.5f;
+    public const float SackX = 1f;
+    public const float SackCrateTop = 1.05f;
+    public const float FrontZ = -1f;
 
     [MenuItem("Tools/Models/Turret/Build Trapper")]
     public static void BuildTrapper()
     {
         Save(BuildBody(), BodyPath);
+        Save(BuildSack(), SackPath);
+        Save(BuildPedestal(), PedestalPath);
+        Save(BuildHand(), HandPath);
         Begin();
         TrapBase(Vector3.zero, Quaternion.identity, 1f);
         Save(Finish("RatTrapBase"), TrapBasePath);
@@ -85,13 +105,75 @@ public static class TrapperModelBuilder
         new List<int>(), new List<int>(), new List<int>(), new List<int>()
     };
 
-    /// <summary>The Trapper: the cat sitting beside its sack of traps, facing +Z, feet on y 0.</summary>
+    /// <summary>The cat alone (the part that turns), feet at the origin, facing +Z.</summary>
     public static Mesh BuildBody()
     {
         Begin();
-        Cat(new Vector3(-0.25f, 0f, 0.12f), 0.38f);
-        Sack(new Vector3(0.33f, 0f, -0.12f));
+        Cat(Vector3.zero, 0.38f);
         return Finish("TrapperBody");
+    }
+
+    /// <summary>One round paw (world units, centred; not scaled with the cat).</summary>
+    public static Mesh BuildHand()
+    {
+        Begin();
+        Ball(FurAccent, Vector3.zero, new Vector3(0.11f, 0.09f, 0.12f), 8, true);
+        return Finish("TrapperHand");
+    }
+
+    /// <summary>The sack of traps alone, bottom at the origin, traps facing +Z.</summary>
+    public static Mesh BuildSack()
+    {
+        Begin();
+        Sack(Vector3.zero);
+        return Finish("TrapperSack");
+    }
+
+    /// <summary>The crates of the L, in the turret root's space: the cat's stack, the sack's stack, the front box.
+    /// Two submeshes: 0 crate (FenceCrate), 1 frame (FenceCrateFrame).</summary>
+    public static Mesh BuildPedestal()
+    {
+        Begin();
+        Crate(Vector3.zero, new Vector3(0.95f, 0.95f, 0.95f), 0f);
+        Crate(new Vector3(0.02f, 0.95f, -0.02f), new Vector3(0.8f, StackTop - 0.95f, 0.8f), 8f);
+        Crate(new Vector3(SackX, 0f, 0f), new Vector3(0.92f, 0.6f, 0.92f), -4f);
+        Crate(new Vector3(SackX + 0.02f, 0.6f, 0.01f), new Vector3(0.7f, SackCrateTop - 0.6f, 0.7f), 9f);
+        Crate(new Vector3(0.02f, 0f, FrontZ), new Vector3(0.9f, 0.5f, 0.8f), -7f);
+        return Finish("TrapperPedestal", 2);
+    }
+
+    // A wooden crate like the fence's lone-cell crates: body, darker edge frame, a cross brace on the front and back.
+    private static void Crate(Vector3 bottom, Vector3 size, float yaw)
+    {
+        Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
+        Vector3 c = bottom + Vector3.up * size.y * 0.5f;
+        Box(0, c, size, rot);
+        float t = 0.08f;
+        Vector3 h = size * 0.5f;
+        for (int a = -1; a <= 1; a += 2)
+        {
+            for (int b = -1; b <= 1; b += 2)
+            {
+                Box(1, c + rot * new Vector3(a * h.x, 0f, b * h.z), new Vector3(t, size.y + 0.01f, t), rot);
+                Box(1, c + rot * new Vector3(0f, a * h.y, b * h.z), new Vector3(size.x + 0.01f, t, t), rot);
+                Box(1, c + rot * new Vector3(a * h.x, b * h.y, 0f), new Vector3(t, t, size.z + 0.01f), rot);
+            }
+        }
+        float angle = Mathf.Atan2(size.y - t, size.x - t) * Mathf.Rad2Deg;
+        float len = Mathf.Sqrt((size.x - t) * (size.x - t) + (size.y - t) * (size.y - t));
+        for (int z = -1; z <= 1; z += 2)
+        {
+            Box(1, c + rot * new Vector3(0f, 0f, z * (h.z + 0.01f)), new Vector3(len, t * 0.9f, 0.03f), rot * Quaternion.Euler(0f, 0f, z * angle));
+        }
+        // Plank seams on the sides.
+        for (int k = 1; k < 3; k++)
+        {
+            float y = -h.y + size.y * k / 3f;
+            for (int x = -1; x <= 1; x += 2)
+            {
+                Box(1, c + rot * new Vector3(x * (h.x + 0.005f), y, 0f), new Vector3(0.02f, 0.025f, size.z), rot);
+            }
+        }
     }
 
     // The round grumpy cat (sketch): one big round head-body, ears, half-shut eyes under slanted brows, a muzzle with
@@ -118,8 +200,7 @@ public static class TrapperModelBuilder
                 Box(Dark, c + new Vector3(side * r * 0.62f, -r * (0.02f + w * 0.12f), r * 0.68f), new Vector3(r * 0.28f, r * 0.025f, r * 0.03f),
                     Quaternion.Euler(0f, side * -30f, side * (w == 0 ? 6f : -6f)));
             }
-            // Front paws resting on the ground.
-            Ball(FurAccent, feet + new Vector3(side * r * 0.36f, r * 0.1f, r * 0.62f), new Vector3(r * 0.2f, r * 0.12f, r * 0.24f), 6, true);
+            // (Front paws: separate hand objects since 2026-11-23, see BuildHand.)
         }
         Box(Dark, c + new Vector3(0f, r * 0.04f, r * 0.93f), new Vector3(r * 0.1f, r * 0.07f, r * 0.05f), Quaternion.identity);
         // Frown under the muzzle.
@@ -217,11 +298,16 @@ public static class TrapperModelBuilder
 
     private static Mesh Finish(string name)
     {
+        return Finish(name, SubmeshCount);
+    }
+
+    private static Mesh Finish(string name, int submeshes)
+    {
         Mesh mesh = new Mesh { name = name };
         mesh.SetVertices(Vertices);
         mesh.SetNormals(Normals);
-        mesh.subMeshCount = SubmeshCount;
-        for (int i = 0; i < SubmeshCount; i++)
+        mesh.subMeshCount = submeshes;
+        for (int i = 0; i < submeshes; i++)
         {
             mesh.SetTriangles(Triangles[i], i);
         }

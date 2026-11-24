@@ -221,7 +221,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.5, y: 1.5, z: 1.5}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6907038046197506590}
@@ -241,10 +241,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RatTrap
   bar: {fileID: 8329328372616303132}
   snapAngle: 180
-  snapTime: 0.07
+  snapTime: 0.01
   snappedHold: 0.35
-  shrinkTime: 0.15
+  shrinkTime: 0.1
   snapHop: 0.12
+  flingUpSpeed: 25
+  flingTiltMin: 15
+  flingTiltMax: 40
+  flingSpin: 720
+  flingGravity: 0
+  flingVanishAt: 0.1
+  flingOnExpire: 0
+  randomLandingYaw: 1
+  pileJitter: 0.12
+  pileRadius: 0.35
+  pileLift: 0.12
+  pileTilt: 8
+  pileFallSpeed: 2
 --- !u!1 &7745198916606706783
 GameObject:
   m_ObjectHideFlags: 0
@@ -271,7 +284,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.6, y: 1.6, z: 1.6}
+  m_LocalScale: {x: 2.2, y: 2.2, z: 2.2}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6550495375322227847}

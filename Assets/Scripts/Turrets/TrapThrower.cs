@@ -3,18 +3,25 @@
  * The Trapper turret's weapon (2026-11-23; user: the cat grabs a trap, arms it and throws it onto the nearest path every
  * so often; traps last a while and snap on their own when they run out). On the Trapper prefab's root, next to Turret.
  *
- * - Every stats.throwInterval seconds (while fewer than stats.maxTraps of its traps are flying or set) it picks a spot:
- *   the busiest route cell centre within stats.range of the Trapper (flat) that is at least stats.trapSpacing from every
- *   set or flying trap (ties: the nearest); none free = it waits and tries again next frame. Route cells (shared, rebuilt
+ * - One throw per stats.throwInterval, always (no trap cap since 2026-11-23, user: "it should always be throwing"). The
+ *   spot is picked just before each throw:
+ *   the most valuable route cell centre within stats.range of the Trapper (flat): value = the cell's traffic x
+ *   stats.stackValue per set or flying trap already on it (closer than stats.trapSpacing; any Trapper's), ties the nearest
+ *   (2026-11-23, user: prefer spots without a trap but don't exclude them, so traps still stack). Only Path cells (the dirt
+ *   path, PathFloor) are used, never open chunk grass, and each spot sits in the middle of its dirt corridor (PathCentre:
+ *   centred across the way rats walk there, by the flow field, when that's at most stats.pathCentreMaxWidth cells wide;
+ *   one spot per row along the corridor) (2026-11-23, user). Route cells (shared, rebuilt
  *   when the flow field is) = the cells rats really walk: traced along the FlowField from every entrance of the base layout
  *   (a walkable layout cell next to walkable ground outside it) to the base; a cell's traffic = how many entrance routes
  *   pass through it, so traps go where the routes converge (a first try with the nearest route cell put them on a side
  *   route few rats used). With no route cell in range it falls back to the nearest Path
  *   cell (a side path rats may never use: first test showed traps there expiring unused). The spot sits on the map
  *   ground (MapGround height) when there is one.
- * - It turns its body (the model, `body`) toward the spot at stats.turnSpeed and throws a pooled RatTrap from `hand`
- *   (RatTrap.Launch). The first throw comes after one interval. Between throws the body turns back toward the turret's
- *   rest direction (the nearest path).
+ * - The throw animation (2026-11-23, user): `animator` (TrapperAnimator) loops one cycle per stats.throwInterval (turn to
+ *   the bag, rummage, pull out a trap, arm it, turn to the spot, throw, back to rest); it asks this for the spot at its
+ *   pick time and calls back at its release time, when a pooled RatTrap is launched from the right paw (RatTrap.Launch).
+ *   The animator turns the cat (Body); the crates and sack never turn. (This replaced change 6's aim-then-throw turn.)
+ *   Without an animator it throws every interval from `hand` without turning.
  * - Traps come from one shared ComponentPool<RatTrap> (trapPrefab, under "Rat Traps"), never instantiated per throw.
  * - Range is the stats' range (Turret.Range uses it for the range ring and the build ghost). No upgrades yet (user).
  */
@@ -34,16 +41,14 @@ public class TrapThrower : MonoBehaviour
 
     [SerializeField] private TrapperStats stats;
     [SerializeField] private RatTrap trapPrefab;
-    [Tooltip("The model that turns toward where it throws (Body).")]
-    [SerializeField] private Transform body;
-    [Tooltip("Where the trap leaves the cat (a child of the body, at its paws).")]
+    [Tooltip("Plays the throw cycle and turns the cat; it launches the trap at its release time.")]
+    [SerializeField] private TrapperAnimator animator;
+    [Tooltip("Where the trap leaves the cat when there is no animator.")]
     [SerializeField] private Transform hand;
     [SerializeField, Min(0)] private int prewarm = 8;
 
     private Turret turret;
     private float cooldown;
-    private Vector3 facing = Vector3.forward;
-    private readonly List<Vector3> candidates = new List<Vector3>();
 
     public float Range => stats != null ? stats.Range : 0f;
     public TrapperStats Stats => stats;
@@ -73,14 +78,32 @@ public class TrapThrower : MonoBehaviour
     private void Start()
     {
         cooldown = stats != null ? stats.ThrowInterval : 1f;
-        if (turret != null)
+        if (animator != null && stats != null && trapPrefab != null)
         {
-            facing = turret.RestDirection;
+            animator.RestDirection = turret != null ? turret.RestDirection : transform.forward;
+            animator.Run(CycleSeconds, PickSpot, Launch);
         }
-        if (body != null)
-        {
-            body.rotation = Quaternion.LookRotation(facing);
-        }
+    }
+
+    private float CycleSeconds()
+    {
+        return stats != null ? stats.ThrowInterval : 1f;
+    }
+
+    // The animator asks for the spot just before the throw (null = nowhere to throw this cycle).
+    private Vector3? PickSpot()
+    {
+        RefreshRouteField();
+        Vector3 spot;
+        return FindSpot(out spot) ? spot : (Vector3?)null;
+    }
+
+    private void Launch(Vector3 from, Vector3 spot)
+    {
+        ComponentPool<RatTrap> pool = Pool();
+        RatTrap trap = pool.Get(from, Quaternion.identity);
+        trap.Launch(pool, from, spot, stats, this);
+        Thrown++;
     }
 
     private void OnEnable()
@@ -95,10 +118,27 @@ public class TrapThrower : MonoBehaviour
 
     private void Update()
     {
-        if (stats == null || trapPrefab == null)
+        if (stats == null || trapPrefab == null || animator != null)
         {
             return;
         }
+        RefreshRouteField();
+        cooldown -= Time.deltaTime;
+        if (cooldown > 0f)
+        {
+            return;
+        }
+        Vector3 spot;
+        if (FindSpot(out spot))
+        {
+            Launch(hand != null ? hand.position : transform.position + Vector3.up * 0.6f, spot);
+        }
+        cooldown = stats.ThrowInterval;
+    }
+
+    // Follows the current flow field so the route is rebuilt when the layout changes.
+    private void RefreshRouteField()
+    {
         FlowField field = FlowField.Instance;
         if (field != routeField)
         {
@@ -113,29 +153,6 @@ public class TrapThrower : MonoBehaviour
             }
             routeDirty = true;
         }
-        Turn();
-        cooldown -= Time.deltaTime;
-        if (cooldown > 0f || LiveTraps >= stats.MaxTraps)
-        {
-            return;
-        }
-        Vector3 spot;
-        if (!FindSpot(out spot))
-        {
-            return;
-        }
-        Throw(spot);
-        cooldown = stats.ThrowInterval;
-    }
-
-    private void Turn()
-    {
-        if (body == null)
-        {
-            return;
-        }
-        Quaternion wanted = Quaternion.LookRotation(facing);
-        body.rotation = Quaternion.RotateTowards(body.rotation, wanted, stats.TurnSpeed * Time.deltaTime);
     }
 
     // The cells rats walk: from every entrance of the layout, follow the flow field to the base.
@@ -193,7 +210,7 @@ public class TrapThrower : MonoBehaviour
         }
     }
 
-    // The nearest route cell (else Path cell) centre in range that keeps trapSpacing from every set or flying trap.
+    // The best route cell (else Path cell) centre in range: traffic x stackValue per trap already on it, ties nearest.
     private bool FindSpot(out Vector3 spot)
     {
         spot = Vector3.zero;
@@ -225,7 +242,7 @@ public class TrapThrower : MonoBehaviour
         int reach = Mathf.CeilToInt(stats.Range / grid.CellSize);
         Vector2Int home = grid.WorldToCell(centre);
         float best = float.MaxValue;
-        int bestTraffic = -1;
+        float bestValue = -1f;
         bool found = false;
         float sqrRange = stats.Range * stats.Range;
         float sqrSpacing = stats.TrapSpacing * stats.TrapSpacing;
@@ -234,22 +251,27 @@ public class TrapThrower : MonoBehaviour
             for (int dy = -reach; dy <= reach; dy++)
             {
                 Vector2Int cell = new Vector2Int(home.x + dx, home.y + dy);
-                int traffic = 0;
-                if (onRoute ? !route.TryGetValue(cell, out traffic) || grid.GetState(cell) == CellState.Base : grid.GetState(cell) != CellState.Path)
+                int traffic = 1;
+                if (grid.GetState(cell) != CellState.Path || (onRoute && !route.TryGetValue(cell, out traffic)))
                 {
                     continue;
                 }
-                Vector3 p = grid.CellToWorld(cell);
+                Vector3 p = PathCentre(grid, routeField, cell, stats.PathCentreMaxWidth);
                 p.y = 0f;
                 Vector3 offset = p - centre;
                 offset.y = 0f;
                 float sqr = offset.sqrMagnitude;
-                if (sqr > sqrRange || traffic < bestTraffic || (traffic == bestTraffic && sqr >= best) || Crowded(p, sqrSpacing))
+                if (sqr > sqrRange)
+                {
+                    continue;
+                }
+                float value = traffic * Mathf.Pow(stats.StackValue, TrapsOn(p, sqrSpacing));
+                if (value < bestValue - 0.0001f || (value < bestValue + 0.0001f && sqr >= best))
                 {
                     continue;
                 }
                 best = sqr;
-                bestTraffic = traffic;
+                bestValue = value;
                 spot = p;
                 found = true;
             }
@@ -257,8 +279,48 @@ public class TrapThrower : MonoBehaviour
         return found;
     }
 
-    private static bool Crowded(Vector3 p, float sqrSpacing)
+    // The cell's spot moved to the middle of its dirt corridor: centred across the way rats walk there (the flow field's
+    // direction; without one, across the narrower axis), when the Path run across is at most maxWidth cells. So a 4-wide
+    // corridor's cells map to its centre line, one spot per row along it.
+    private static Vector3 PathCentre(BuildGrid grid, FlowField field, Vector2Int cell, int maxWidth)
     {
+        int left = PathRun(grid, cell, Vector2Int.left, maxWidth);
+        int right = PathRun(grid, cell, Vector2Int.right, maxWidth);
+        int down = PathRun(grid, cell, Vector2Int.down, maxWidth);
+        int up = PathRun(grid, cell, Vector2Int.up, maxWidth);
+        int widthX = left + right + 1;
+        int widthZ = down + up + 1;
+        Vector3 flow = field != null ? field.GetCellDirection(cell) : Vector3.zero;
+        bool acrossX = flow.sqrMagnitude > 0.0001f ? Mathf.Abs(flow.z) >= Mathf.Abs(flow.x) : widthX <= widthZ;
+        Vector3 p = grid.CellToWorld(cell);
+        if (acrossX && widthX <= maxWidth)
+        {
+            p.x += (right - left) * grid.CellSize * 0.5f;
+        }
+        else if (!acrossX && widthZ <= maxWidth)
+        {
+            p.z += (up - down) * grid.CellSize * 0.5f;
+        }
+        return p;
+    }
+
+    // How many Path cells follow the cell in one direction (stops past maxWidth).
+    private static int PathRun(BuildGrid grid, Vector2Int cell, Vector2Int step, int maxWidth)
+    {
+        int count = 0;
+        Vector2Int next = cell + step;
+        while (count <= maxWidth && grid.GetState(next) == CellState.Path)
+        {
+            count++;
+            next += step;
+        }
+        return count;
+    }
+
+    // Set or flying traps (any Trapper's) lying on the spot (closer than trapSpacing).
+    private static int TrapsOn(Vector3 p, float sqrSpacing)
+    {
+        int count = 0;
         List<RatTrap> active = RatTrap.Active;
         for (int i = 0; i < active.Count; i++)
         {
@@ -266,29 +328,10 @@ public class TrapThrower : MonoBehaviour
             offset.y = 0f;
             if (offset.sqrMagnitude < sqrSpacing)
             {
-                return true;
+                count++;
             }
         }
-        return false;
-    }
-
-    private void Throw(Vector3 spot)
-    {
-        Vector3 flat = spot - transform.position;
-        flat.y = 0f;
-        if (flat.sqrMagnitude > 0.0001f)
-        {
-            facing = flat.normalized;
-        }
-        if (body != null)
-        {
-            body.rotation = Quaternion.LookRotation(facing);
-        }
-        ComponentPool<RatTrap> pool = Pool();
-        Vector3 start = hand != null ? hand.position : transform.position + Vector3.up * 0.6f;
-        RatTrap trap = pool.Get(start, Quaternion.identity);
-        trap.Launch(pool, start, spot, stats, this);
-        Thrown++;
+        return count;
     }
 
     /// <summary>Traps thrown by every Trapper (for tests).</summary>

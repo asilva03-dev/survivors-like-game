@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TrapperStats
   range: 6
   throwInterval: 2.5
-  maxTraps: 5
   trapSpacing: 0.9
+  stackValue: 0.5
+  pathCentreMaxWidth: 6
   flightTime: 0.55
   arcHeight: 1.4
-  trapLifetime: 15
+  trapLifetime: 10
   damage: 10
-  triggerRadius: 0.45
-  turnSpeed: 540
+  triggerRadius: 0.9

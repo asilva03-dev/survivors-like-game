@@ -261,10 +261,12 @@ public class BuildMode : MonoBehaviour
         TurretSelectionChanged?.Invoke();
     }
 
-    // The turret whose body (ground up to pickHeight) the cursor ray passes closest to, within pickRadius.
+    // The turret whose body (ground up to pickHeight, over each of its tiles since footprints, 2026-11-23) the cursor
+    // ray passes closest to, within pickRadius.
     public Turret TurretAtCursor(Vector2 screenPoint)
     {
         Camera cam = Camera.main;
+        BuildGrid grid = BuildGrid.Instance;
         if (cam == null)
         {
             return null;
@@ -276,14 +278,20 @@ public class BuildMode : MonoBehaviour
         for (int i = 0; i < Turret.Active.Count; i++)
         {
             Turret turret = Turret.Active[i];
-            for (float h = 0f; h <= pickHeight + 0.001f; h += pickHeight / 6f)
+            int tiles = grid != null ? turret.Cells.Count : 1;
+            for (int c = 0; c < tiles; c++)
             {
-                Vector3 point = turret.Center + Vector3.up * h;
-                float distance = Vector3.Cross(ray.direction, point - ray.origin).magnitude;
-                if (distance < bestDistance)
+                Vector3 foot = grid != null ? grid.CellToWorld(turret.Cells[c]) : turret.Center;
+                foot.y = 0f;
+                for (float h = 0f; h <= pickHeight + 0.001f; h += pickHeight / 6f)
                 {
-                    bestDistance = distance;
-                    best = turret;
+                    Vector3 point = foot + Vector3.up * h;
+                    float distance = Vector3.Cross(ray.direction, point - ray.origin).magnitude;
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        best = turret;
+                    }
                 }
             }
         }

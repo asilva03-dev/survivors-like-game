@@ -90,12 +90,13 @@ public class BuildStripHighlight : MonoBehaviour
         dirty = true;
     }
 
-    // Red when any built turret's no-build circle touches the tile, else the normal strip colour.
+    // Red when any built turret's no-build circle touches the tile or a turret stands on it (footprints, 2026-11-23),
+    // else the normal strip colour.
     public bool IsBlocked(Vector2Int cell)
     {
         for (int i = 0; i < Turret.Active.Count; i++)
         {
-            if (Turret.Active[i].CircleTouches(cell))
+            if (Turret.Active[i].CircleTouches(cell) || Turret.Active[i].Occupies(cell))
             {
                 return true;
             }

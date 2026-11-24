@@ -3,8 +3,10 @@
  * Root component of a built turret. Knows its definition and the build-strip tile it stands on, and keeps the
  * static Active list that placement checks against.
  *
- * - Placed by TurretPlacer (P key for now) with Init(definition, cell); the root sits on the tile centre at
- *   ground height and never rotates (the TurretGun child turns the body).
+ * - Placed by TurretPlacer with Init(definition, cell, rotation); the root sits on its corner tile's centre at ground
+ *   height. Since 2026-11-23 (footprints) the root is turned rotation quarter turns (0 for one-tile turrets) and never
+ *   turns after that (the TurretGun / TrapThrower turns the body). Cells = every tile it stands on
+ *   (TurretDefinition.Cells); Occupies(cell).
  * - No health and never targeted (walls and turrets can't be damaged). No collider that blocks the player.
  * - RestDirection (set in Init): toward the nearest Path cell within 12 cells (else the nearest walkable cell,
  *   else north). The gun starts facing it and scans around it while idle (see TurretGun).
@@ -47,6 +49,9 @@ public class Turret : MonoBehaviour
 
     public TurretDefinition Definition => definition;
     public Vector2Int Cell { get; private set; }
+    public int Rotation { get; private set; }
+    private readonly List<Vector2Int> cells = new List<Vector2Int>();
+    public IReadOnlyList<Vector2Int> Cells => cells;
     public Vector3 RestDirection { get; private set; } = Vector3.forward;
     public float SpacingRadius => definition != null ? definition.SpacingRadius : 0f;
     public float Range => gun != null ? gun.Range : thrower != null ? thrower.Range : 0f;
@@ -206,8 +211,23 @@ public class Turret : MonoBehaviour
 
     public void Init(TurretDefinition turretDefinition, Vector2Int cell)
     {
+        Init(turretDefinition, cell, 0);
+    }
+
+    public void Init(TurretDefinition turretDefinition, Vector2Int cell, int rotation)
+    {
         definition = turretDefinition;
         Cell = cell;
+        Rotation = rotation;
+        cells.Clear();
+        if (definition != null)
+        {
+            definition.Cells(cell, rotation, cells);
+        }
+        else
+        {
+            cells.Add(cell);
+        }
         tiers = new int[definition != null ? definition.Paths.Count : 0];
         TotalSpent = definition != null ? definition.WoodCost : 0;
         RestDirection = FindRestDirection(cell);
@@ -216,6 +236,11 @@ public class Turret : MonoBehaviour
             gun.FaceRest();
         }
         ActiveChanged?.Invoke();
+    }
+
+    public bool Occupies(Vector2Int cell)
+    {
+        return cells.Contains(cell);
     }
 
     // Does this turret's no-build circle touch the cell (any part of the cell square inside the circle)?
