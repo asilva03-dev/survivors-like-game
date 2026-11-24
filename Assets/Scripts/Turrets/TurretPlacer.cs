@@ -3,12 +3,11 @@
  * The build function for defenses (scene object TurretPlacer). Build mode's ghost (BuildGhost) calls it when the
  * player left-clicks a tile; the old P debug key was removed in slice 6 step 4.
  *
- * - CanPlace(cell, definition, rotation, out reason) = the placement rules (tile rule, slice 6), for every tile of the
- *   turret (cell = its corner tile + the definition's footprint turned `rotation` quarter turns; 2026-11-23): a
- *   BuildStrip cell, its centre inside the base light (BaseLight.Contains), no turret on it, not touched by another
- *   turret's spacing circle (a red tile); and the new turret's own spacing circle (around its corner tile) must not touch
- *   a tile holding a turret. The reason is a short player-facing line shown under the ghost. Overloads without a
- *   rotation use 0.
+ * - CanPlace(cell, definition, rotation, out reason) = the placement rules for every tile of the turret (cell = its
+ *   corner tile + the definition's footprint turned `rotation` quarter turns; 2026-11-23): a BuildStrip cell, its centre
+ *   inside the base light (BaseLight.Contains) and no turret on it. Footprint only (user, 2026-11-24, replaces the slice-6
+ *   spacing circles): towers take up only their own tiles and may stand right next to each other. The reason is a short
+ *   player-facing line shown under the ghost. Overloads without a rotation use 0.
  * - TryBuild(definition, cell, out reason) also needs enough wood: it spends definition.WoodCost from the
  *   ResourceInventory and builds the turret on its corner tile's centre, its root turned rotation x 90 deg. TryBuildFree
  *   skips the wood (tests).
@@ -156,7 +155,6 @@ public class TurretPlacer : MonoBehaviour
             }
         }
 
-        Vector3 center = grid.CellToWorld(cell);
         for (int i = 0; i < Turret.Active.Count; i++)
         {
             Turret other = Turret.Active[i];
@@ -165,22 +163,6 @@ public class TurretPlacer : MonoBehaviour
                 if (other.Occupies(newCells[c]))
                 {
                     reason = "Tile already taken";
-                    return false;
-                }
-
-                if (other.CircleTouches(newCells[c]))
-                {
-                    reason = "Too close to another defense";
-                    return false;
-                }
-            }
-
-            IReadOnlyList<Vector2Int> otherCells = other.Cells;
-            for (int c = 0; c < otherCells.Count; c++)
-            {
-                if (Turret.CircleTouches(center, definition.SpacingRadius, otherCells[c]))
-                {
-                    reason = "Too close to another defense";
                     return false;
                 }
             }

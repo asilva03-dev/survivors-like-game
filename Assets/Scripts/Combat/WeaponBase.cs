@@ -39,6 +39,8 @@ public abstract class WeaponBase<TStats> : WeaponBase where TStats : WeaponStats
 
     protected TStats Stats => stats;
     protected bool IsReady => cooldown <= 0f;
+    // Seconds until the next attack may fire (read-only; the Fishercat's animation times its throw by it, 2026-11-24).
+    protected float CooldownLeft => cooldown;
 
     public override float Range => stats.Range;
 

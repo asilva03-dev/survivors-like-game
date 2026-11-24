@@ -5,8 +5,8 @@
  *
  * - One runtime mesh `BuildStripMesh` (world space, child of this object): an inset quad per strip cell in
  *   stripColor, vertex coloured, `material` = a vertex-colour transparent material (GridDebug.mat), no shadows.
- * - Strip tiles touched by a built turret's no-build circle (Turret.CircleTouches) are blockedColor (red): the
- *   player can't build there (the tile rule, slice 6). This replaces the old red spacing disc.
+ * - Strip tiles a built turret stands on are blockedColor (red): the player can't build there. Footprint only since
+ *   2026-11-24 (user): no spacing circles any more, towers may stand right next to each other.
  * - Rebuilt when the grid changes (a chunk placed) or a turret is placed/removed; shown only while BuildMode is open.
  */
 
@@ -90,13 +90,12 @@ public class BuildStripHighlight : MonoBehaviour
         dirty = true;
     }
 
-    // Red when any built turret's no-build circle touches the tile or a turret stands on it (footprints, 2026-11-23),
-    // else the normal strip colour.
+    // Red when a built turret stands on the tile (footprint only, 2026-11-24), else the normal strip colour.
     public bool IsBlocked(Vector2Int cell)
     {
         for (int i = 0; i < Turret.Active.Count; i++)
         {
-            if (Turret.Active[i].CircleTouches(cell) || Turret.Active[i].Occupies(cell))
+            if (Turret.Active[i].Occupies(cell))
             {
                 return true;
             }

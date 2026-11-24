@@ -37,6 +37,9 @@
  *   refuses) and sets off BulletBlasts.Explode at the enemy's aim point.
  * - The trail is cleared on launch so a reused projectile does not streak from its old position.
  * - Pooled prefab setup: shared unlit material, shadows off, TrailRenderer on a child at the back.
+ * - Spent hook (2026-11-24, Fishercat spears): a component on the projectile that implements IProjectileSpent is told
+ *   where and in which direction the projectile ended (the cast's hit point, else its position) just before it goes back
+ *   to the pool. Nothing listens on ordinary bullets, so they behave as before.
  */
 
 using UnityEngine;
@@ -82,6 +85,23 @@ public class Projectile : MonoBehaviour
     private int piercesLeft;
     private float homingRadius;
     private readonly System.Collections.Generic.List<Damageable> hitTargets = new System.Collections.Generic.List<Damageable>();
+    private IProjectileSpent spent;
+    private bool spentLooked;
+
+    // Tells an IProjectileSpent listener where the projectile ended, then returns it to the pool.
+    private void Finish(Vector3 where)
+    {
+        if (!spentLooked)
+        {
+            spent = GetComponent<IProjectileSpent>();
+            spentLooked = true;
+        }
+        if (spent != null)
+        {
+            spent.OnProjectileSpent(where, direction);
+        }
+        pool.Release(this);
+    }
 
     public void Launch(ComponentPool<Projectile> owningPool, Vector3 travelDirection, float travelSpeed,
         WeaponStats weaponStats, float maxLifetime, Transform ignore,
@@ -117,7 +137,7 @@ public class Projectile : MonoBehaviour
 
         if (HitOverlappingTarget())
         {
-            pool.Release(this);
+            Finish(transform.position);
         }
     }
 
@@ -347,7 +367,7 @@ public class Projectile : MonoBehaviour
         // between two casts; a cast ignores what it starts inside, so check the current position first.
         if (HitOverlappingTarget())
         {
-            pool.Release(this);
+            Finish(transform.position);
             return;
         }
 
@@ -367,7 +387,7 @@ public class Projectile : MonoBehaviour
                 {
                     if (target == null || HitAndCheckDone(target))
                     {
-                        pool.Release(this);
+                        Finish(hit.point);
                         return;
                     }
                 }
@@ -379,7 +399,13 @@ public class Projectile : MonoBehaviour
         age += Time.deltaTime;
         if (age >= lifetime)
         {
-            pool.Release(this);
+            Finish(transform.position);
         }
     }
+}
+
+/// <summary>On a projectile: told where (and heading which way) it ended, just before it returns to the pool.</summary>
+public interface IProjectileSpent
+{
+    void OnProjectileSpent(Vector3 where, Vector3 direction);
 }

@@ -6,8 +6,8 @@
  *
  * - displayName and woodCost (15 for the gun turret) are shown on its build-bar slot; woodCost is spent when placed.
  * - sellRefundShare (0.5): selling refunds this share of the wood spent on the turret, rounded down.
- * - spacingRadius: the turret's no-build circle (around its corner tile); the strip tiles it touches turn red and can't
- *   be built on (tile rule, slice 6).
+ * - spacingRadius: unused since 2026-11-24 (user: towers take up only their footprint and may stand right next to each
+ *   other); it was the slice-6 no-build circle. Kept so the assets keep their values.
  * - footprint (2026-11-23, Trapper's L, user): the extra build-strip tiles the turret stands on besides its corner tile,
  *   as offsets at rotation 0 (x east, y north = up on screen). Empty = one tile (the gun turret). A turret with a
  *   footprint can be turned in quarter turns in build mode (scroll); Cells(anchor, rotation, list) lists every tile.

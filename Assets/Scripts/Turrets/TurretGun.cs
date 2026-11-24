@@ -13,6 +13,8 @@
  * - Shadow rats (2026-11-21) are skipped unless its stats detect shadows or the rat stands in a RevealLight.
  * - With no target it scans left and right around the turret's rest direction (toward the nearest path cell); the
  *   sweep size and speed are on the TurretDefinition. It turns to a new target at the stats' turnSpeed.
+ * - For animation (2026-11-24, Fishercat): Recharge (0 right after a shot, 1 when ready), HasTarget (a target in range
+ *   this frame) and the Fired event (after each shot). Read-only; nothing about firing changes.
  */
 
 using UnityEngine;
@@ -26,6 +28,19 @@ public class TurretGun : GunWeapon
     private int lastIdleFrame = -10;
 
     private Turret Turret => turret != null ? turret : (turret = GetComponentInParent<Turret>());
+
+    /// <summary>0 right after a shot, rising to 1 when the next one may fire.</summary>
+    public float Recharge => 1f - Mathf.Clamp01(CooldownLeft / Mathf.Max(0.01f, Stats.AttackInterval));
+    /// <summary>A target was in range this frame.</summary>
+    public bool HasTarget { get; private set; }
+    /// <summary>Raised after every shot.</summary>
+    public event System.Action Fired;
+
+    protected override void Fire(Damageable target)
+    {
+        base.Fire(target);
+        Fired?.Invoke();
+    }
 
     // The stats in use: the shared asset until an upgrade is bought, then this turret's own copy (Turret builds it).
     public GunStats CurrentStats => Stats;
@@ -101,6 +116,7 @@ public class TurretGun : GunWeapon
             }
         }
 
+        HasTarget = best != null;
         return best;
     }
 
