@@ -864,6 +864,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 740cdd7f0915e6646987a4edae18c48e, type: 2}
     - {fileID: 11400000, guid: f0333d0d51f764e41a774dec8c0fb725, type: 2}
     - {fileID: 11400000, guid: f3dd28d2e2314954e81f063362688738, type: 2}
+    - {fileID: 11400000, guid: d3ace69c07d912346b0facfcdceb62e0, type: 2}
   - name: Traps
     defenses: []
   - name: Other

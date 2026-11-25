@@ -18,6 +18,8 @@
  * - MeleeTarget (2026-11-25, SwordsCat): while a TurretSwing sets it, the gun faces that rat and skips its shots (the
  *   cooldown still runs). Null on every other tower, so they are unchanged. HoldFire (same day, melee-mode linger): no
  *   shots while set, aiming unchanged; false on every other tower.
+ * - IdleDirection (2026-11-25, Angel Cat): while set, the gun faces it when it has no target (the flight direction)
+ *   instead of scanning. Null on every other tower.
  */
 
 using UnityEngine;
@@ -44,6 +46,9 @@ public class TurretGun : GunWeapon
     public Damageable MeleeTarget { get; set; }
     /// <summary>Set by a TurretSwing while its tower is in melee mode: no shots. False on every other tower.</summary>
     public bool HoldFire { get; set; }
+    /// <summary>Set by AngelcatFlight: with no target the gun faces this way instead of scanning. Null (the default,
+    /// every other tower) changes nothing.</summary>
+    public Vector3? IdleDirection { get; set; }
 
     protected override void Fire(Damageable target)
     {
@@ -80,6 +85,11 @@ public class TurretGun : GunWeapon
     // direction whenever the gun comes back from having a target, so it never jumps mid-sweep.
     protected override Vector3 IdleFacing()
     {
+        if (IdleDirection.HasValue)
+        {
+            return IdleDirection.Value;
+        }
+
         Turret owner = Turret;
         if (owner == null || owner.Definition == null)
         {

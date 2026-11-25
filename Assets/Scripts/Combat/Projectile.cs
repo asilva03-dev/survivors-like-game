@@ -40,6 +40,8 @@
  * - Spent hook (2026-11-24, Fishercat spears): a component on the projectile that implements IProjectileSpent is told
  *   where and in which direction the projectile ended (the cast's hit point, else its position) just before it goes back
  *   to the pool. Nothing listens on ordinary bullets, so they behave as before.
+ * - Hit hook (2026-11-25, Angel Cat arrows): a component that implements IProjectileHit is told about every damageable it
+ *   hits (where the projectile was, and whether that hit killed it), before the spent hook. Opt-in like the spent hook.
  */
 
 using UnityEngine;
@@ -87,6 +89,8 @@ public class Projectile : MonoBehaviour
     private readonly System.Collections.Generic.List<Damageable> hitTargets = new System.Collections.Generic.List<Damageable>();
     private IProjectileSpent spent;
     private bool spentLooked;
+    private IProjectileHit hitListener;
+    private bool hitLooked;
 
     // Tells an IProjectileSpent listener where the projectile ended, then returns it to the pool.
     private void Finish(Vector3 where)
@@ -359,6 +363,15 @@ public class Projectile : MonoBehaviour
         {
             BulletBlasts.Explode(target.AimPoint, gun, target);
         }
+        if (!hitLooked)
+        {
+            hitListener = GetComponent<IProjectileHit>();
+            hitLooked = true;
+        }
+        if (hitListener != null)
+        {
+            hitListener.OnProjectileHit(target, transform.position, !target.gameObject.activeInHierarchy || target.Health <= 0f);
+        }
     }
 
     private void Update()
@@ -408,4 +421,10 @@ public class Projectile : MonoBehaviour
 public interface IProjectileSpent
 {
     void OnProjectileSpent(Vector3 where, Vector3 direction);
+}
+
+/// <summary>On a projectile: told about each damageable it hits (where the projectile was, and whether it died).</summary>
+public interface IProjectileHit
+{
+    void OnProjectileHit(Damageable target, Vector3 where, bool killed);
 }
