@@ -15,6 +15,9 @@
  *   sweep size and speed are on the TurretDefinition. It turns to a new target at the stats' turnSpeed.
  * - For animation (2026-11-24, Fishercat): Recharge (0 right after a shot, 1 when ready), HasTarget (a target in range
  *   this frame) and the Fired event (after each shot). Read-only; nothing about firing changes.
+ * - MeleeTarget (2026-11-25, SwordsCat): while a TurretSwing sets it, the gun faces that rat and skips its shots (the
+ *   cooldown still runs). Null on every other tower, so they are unchanged. HoldFire (same day, melee-mode linger): no
+ *   shots while set, aiming unchanged; false on every other tower.
  */
 
 using UnityEngine;
@@ -36,8 +39,18 @@ public class TurretGun : GunWeapon
     /// <summary>Raised after every shot.</summary>
     public event System.Action Fired;
 
+    /// <summary>Set by a TurretSwing while a rat is within its reach: the gun faces that rat and holds its shot.
+    /// Null (the default, every other tower) changes nothing.</summary>
+    public Damageable MeleeTarget { get; set; }
+    /// <summary>Set by a TurretSwing while its tower is in melee mode: no shots. False on every other tower.</summary>
+    public bool HoldFire { get; set; }
+
     protected override void Fire(Damageable target)
     {
+        if (MeleeTarget != null || HoldFire)
+        {
+            return;
+        }
         base.Fire(target);
         Fired?.Invoke();
     }
@@ -55,6 +68,12 @@ public class TurretGun : GunWeapon
     {
         SnapFacing(Turret != null ? Turret.RestDirection : transform.forward);
         idleTime = 0f;
+    }
+
+    /// <summary>Turns the gun (and the body on it) to face a flat direction at once (SwordsCat swings, 2026-11-25).</summary>
+    public void SnapTo(Vector3 direction)
+    {
+        SnapFacing(direction);
     }
 
     // Idle scan: a sine sweep of IdleScanAngle to each side of the rest direction. It restarts from the rest
@@ -81,6 +100,12 @@ public class TurretGun : GunWeapon
 
     protected override Damageable FindOwnTarget()
     {
+        if (MeleeTarget != null && MeleeTarget.isActiveAndEnabled)
+        {
+            HasTarget = true;
+            return MeleeTarget;
+        }
+
         FlowField field = FlowField.Instance;
         BuildGrid grid = field != null ? field.Grid : null;
         Vector3 basePoint = BaseLight.Instance != null ? BaseLight.Instance.BasePosition : Owner.position;

@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62f6f0d929691c54fbf8f0eadba83546, type: 3}
+  m_Name: SwordscatSwingStats
+  m_EditorClassIdentifier: Assembly-CSharp::SwordSwingStats
+  attackInterval: 0.8
+  damage: 10
+  resourceDamageMultiplier: 0
+  targets: 1
+  lead: 0
+  reach: 2.2
+  arcAngle: 200
+  targetRadius: 0.4
+  detectsShadow: 0
+  modeLinger: 1
