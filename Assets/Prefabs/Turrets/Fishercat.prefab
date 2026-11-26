@@ -818,6 +818,7 @@ MeshRenderer:
   - {fileID: 2100000, guid: 9cde00b7e645eef4ea03a154c6db2469, type: 2}
   - {fileID: 2100000, guid: c8524b3f6e038c44caa202fb8f195dd5, type: 2}
   - {fileID: 2100000, guid: 0a1d4f6396600394e8a3c833258c17bb, type: 2}
+  - {fileID: 2100000, guid: 25650f5706cdb544fba3a83869f991f4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -853,6 +854,7 @@ GameObject:
   - component: {fileID: 5724429828699238358}
   - component: {fileID: 5565969060767927110}
   - component: {fileID: 495746501762639226}
+  - component: {fileID: 996260085345147779}
   m_Layer: 0
   m_Name: Fishercat
   m_TagString: Untagged
@@ -965,3 +967,32 @@ MonoBehaviour:
   readyAim: {x: 0, y: 0.35, z: 1}
   windAim: {x: 0, y: 0.6, z: 1}
   gripOffset: 0.2
+--- !u!114 &996260085345147779
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9064919884702842798}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7a3254ca62383a4fbbc1c53179313b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FishercatWater
+  water: {fileID: 3969386324469650251}
+  rippleMaterial: {fileID: 2100000, guid: f2a24db7f6b433040a85117c88b016c7, type: 2}
+  sources:
+  - {x: -0.08, y: 0.03, z: 0.2}
+  - {x: 1.08, y: 0.03, z: -1.08}
+  - {x: 1.45, y: 0.03, z: 0.05}
+  - {x: -0.35, y: 0.03, z: -1.2}
+  - {x: 0.6, y: 0.03, z: 0.55}
+  rippleTime: 2.4
+  ringsPerSource: 2
+  startRadius: 0.1
+  endRadius: 0.5
+  startWidth: 0.045
+  waterCentre: {x: 0.5, y: 0, z: -0.5}
+  waterRadius: 1.18
+  bobHeight: 0.008
+  bobPeriod: 2.8

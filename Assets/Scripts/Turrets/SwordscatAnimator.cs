@@ -13,6 +13,8 @@
  *   (vertex colours on a Sprites/Default material), so it always matches the real hit area. Since the same day it is
  *   layered: a tapered crescent with a pale glow band, a few trailing speed-line streaks and a white-hot core on the
  *   edge; fading, it thins toward the edge and drifts outward (slashGlow, slashCore, slashStreaks, slashExpand).
+ *   With the swing's path wedge (2026-11-25) its edge follows TurretSwing.HitReachToward in each direction, so it
+ *   reaches further inside the cone facing the nearest path; band widths still follow the base HitReach.
  * - Blade gleam (user 2026-11-25): a four-point star glint (Gleam child of the blade, run-time mesh, turned to the camera)
  *   runs from the guard to the tip late in the sweep, and the steel (bladeRenderer slot steelIndex, a property block)
  *   flashes toward flashColor through the sweep and fades back over flashFade. The wave flick gets the same glint
@@ -424,7 +426,9 @@ public class SwordscatAnimator : MonoBehaviour
         Vector3 forward = new Vector3(slashDirection.x, 0f, slashDirection.z);
         forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
         float alpha = 1f - fade;
-        float reach = swing.HitReach * (1f + slashExpand * fade);
+        // The edge sits at the swing's reach in each direction (longer inside the path wedge); widths follow the base reach.
+        float expand = 1f + slashExpand * fade;
+        float reach = swing.HitReach * expand;
         float arc = swing.ArcAngle;
         float thin = 1f - 0.75f * fade;
         int count = Mathf.Max(2, Mathf.CeilToInt(slashSegments * reveal));
@@ -444,13 +448,14 @@ public class SwordscatAnimator : MonoBehaviour
                 clear.a = 0f;
                 float width = reach * (1f - slashInner) * Mathf.Max(0.06f, taper) * thin;
                 Vector3 d = ArcDirection(forward, arc, u);
+                float edge = swing.HitReachToward(d) * expand;
                 if (layer == 0)
                 {
-                    StripPoint(d, reach - width, reach, clear, glow, i > 0);
+                    StripPoint(d, edge - width, edge, clear, glow, i > 0);
                 }
                 else
                 {
-                    StripPoint(d, reach, reach * (1f + slashGlow * Mathf.Max(0.2f, taper)), glow, clear, i > 0);
+                    StripPoint(d, edge, edge + reach * slashGlow * Mathf.Max(0.2f, taper), glow, clear, i > 0);
                 }
             }
         }
@@ -459,7 +464,7 @@ public class SwordscatAnimator : MonoBehaviour
         for (int k = 0; k < slashStreaks; k++)
         {
             float share = slashStreaks > 1 ? k / (float)(slashStreaks - 1) : 0.5f;
-            float radius = reach * Mathf.Lerp(slashInner + 0.12f, 0.9f, share);
+            float radiusShare = Mathf.Lerp(slashInner + 0.12f, 0.9f, share);
             float end = reveal * (0.5f + 0.2f * share);
             int n = Mathf.Max(2, Mathf.CeilToInt(slashSegments * end));
             Color streak = white;
@@ -470,7 +475,9 @@ public class SwordscatAnimator : MonoBehaviour
                 Color c = streak;
                 c.a *= Mathf.Max(0f, Mathf.Sin(Mathf.PI * i / n)) * Taper(u, reveal, fade);
                 float w = reach * 0.018f;
-                StripPoint(ArcDirection(forward, arc, u), radius - w, radius + w, c, c, i > 0);
+                Vector3 d = ArcDirection(forward, arc, u);
+                float radius = swing.HitReachToward(d) * expand * radiusShare;
+                StripPoint(d, radius - w, radius + w, c, c, i > 0);
             }
         }
 
@@ -484,7 +491,9 @@ public class SwordscatAnimator : MonoBehaviour
             Color soft = white;
             soft.a = 0.3f * alpha;
             float width = reach * slashCore * Mathf.Max(0.15f, taper) * (1f - 0.5f * fade);
-            StripPoint(ArcDirection(forward, arc, u), reach - width, reach, soft, hot, i > 0);
+            Vector3 d = ArcDirection(forward, arc, u);
+            float edge = swing.HitReachToward(d) * expand;
+            StripPoint(d, edge - width, edge, soft, hot, i > 0);
         }
 
         slashMesh.Clear();

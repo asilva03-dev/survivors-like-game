@@ -7,9 +7,10 @@
  * - Footprint 2x2 (corner tile (0, 0) + (1, 0), (0, -1), (1, -1)): every part is in the tower root's space (root = the
  *   corner tile's centre), centred on the footprint's middle (0.5, -0.5). The tower's front is +Z (at rotation 0 the game
  *   camera sees it from behind, like the sketch).
- * - Water (flat, wavy-edged patch over the 4 tiles, ripple rings), the dock (plank deck at DeckTop 1.5 = fence level on
+ * - Water (flat, wavy-edged patch over the 4 tiles; ripples animated by FishercatWater), the dock (plank deck at DeckTop 1.5 = fence level on
  *   four log posts, one taller mooring post, uneven plank ends) and the cooler (red body, white lid flipped open, ice and a
- *   fish tail inside) are static (BuildProps). The barrel (staves, dark bands, three spears standing in it) is its own mesh
+ *   fish tail inside; since 2026-11-25 blue ice packs (IcePack submesh) and loose ice cubes around the fish) are static
+ *   (BuildProps). The barrel (staves, dark bands, three spears standing in it) is its own mesh
  *   (BuildBarrel, pivot at its bottom centre, placed at BarrelSpot) so the throw animation can rattle it when the cat
  *   rummages for a spear (2026-11-24).
  * - The cat (BuildCat, earsOut or ears under the hat) is the part that turns; paws are separate (BuildHand), like the
@@ -34,7 +35,7 @@ public static class FishercatModelBuilder
     public const int Fur = 0, FurAccent = 1, Dark = 2, Hat = 3, HatBand = 4, CatSubmeshes = 5;
     // Prop submeshes.
     public const int Plank = 0, PlankDark = 1, Post = 2, BarrelWood = 3, PropDark = 4, CoolerBody = 5, CoolerWhite = 6,
-        SpearWood = 7, Metal = 8, Fish = 9, Ice = 10, PropSubmeshes = 11;
+        SpearWood = 7, Metal = 8, Fish = 9, Ice = 10, IcePack = 11, PropSubmeshes = 12;
     // Water submeshes.
     public const int Water = 0, Ripple = 1, WaterSubmeshes = 2;
     // Spear submeshes.
@@ -151,7 +152,7 @@ public static class FishercatModelBuilder
 
     // ---- Water.
 
-    /// <summary>A flat wavy-edged patch of water over the 2x2 footprint (root space) with a few ripple rings.</summary>
+    /// <summary>A flat wavy-edged patch of water over the 2x2 footprint (root space); ripples: FishercatWater.</summary>
     public static Mesh BuildWater()
     {
         Begin();
@@ -170,30 +171,9 @@ public static class FishercatModelBuilder
         {
             AddPolyUp(Water, new[] { centre, ring[(i + 1) % n], ring[i] });
         }
-        // Ripple rings around the posts and one in the open.
-        RippleRing(new Vector3(-0.08f, 0.03f, 0.2f), 0.2f, 0.035f);
-        RippleRing(new Vector3(1.08f, 0.03f, -1.08f), 0.24f, 0.035f);
-        RippleRing(new Vector3(1.45f, 0.03f, 0.05f), 0.17f, 0.03f);
-        RippleRing(new Vector3(-0.35f, 0.03f, -1.2f), 0.15f, 0.03f);
-        RippleRing(new Vector3(0.6f, 0.03f, 0.55f), 0.13f, 0.03f);
+        // The ripple rings are animated since 2026-11-25 (Turrets/FishercatWater.cs, same five spots); the Ripple submesh
+        // stays empty.
         return Finish("FishercatWater", WaterSubmeshes);
-    }
-
-    private static void RippleRing(Vector3 centre, float radius, float width)
-    {
-        int n = 14;
-        for (int i = 0; i < n; i++)
-        {
-            if (i % 4 == 3)
-            {
-                continue; // broken ring
-            }
-            float a0 = i * Mathf.PI * 2f / n;
-            float a1 = (i + 1) * Mathf.PI * 2f / n;
-            Vector3 d0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0));
-            Vector3 d1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
-            AddPolyUp(Ripple, new[] { centre + d0 * radius, centre + d1 * radius, centre + d1 * (radius + width), centre + d0 * (radius + width) });
-        }
     }
 
     // ---- Dock, barrel, cooler.
@@ -279,6 +259,20 @@ public static class FishercatModelBuilder
         Ball(Fish, bottom + rot * new Vector3(0.1f, size.y + 0.02f, 0.03f), new Vector3(0.2f, 0.06f, 0.08f), 6, true);
         Vector3 tailBase = bottom + rot * new Vector3(0.28f, size.y + 0.03f, 0.03f);
         Fin(Fish, tailBase, tailBase + rot * new Vector3(0.15f, 0.07f, 0f), tailBase + rot * new Vector3(0.12f, 0.18f, 0f), rot * new Vector3(0f, 0f, 0.012f));
+        // Blue ice packs packed around the fish, half sunk in the ice, plus a few loose ice cubes (user, 2026-11-25).
+        Vector3[] packAt = { new Vector3(-0.24f, 0f, 0.12f), new Vector3(-0.22f, 0f, -0.11f), new Vector3(0.01f, 0f, -0.13f),
+            new Vector3(0.27f, 0f, -0.12f), new Vector3(-0.04f, 0f, 0.15f) };
+        Vector3[] packTilt = { new Vector3(4f, 15f, 8f), new Vector3(-10f, -10f, 0f), new Vector3(0f, 20f, -6f),
+            new Vector3(8f, -25f, 10f), new Vector3(-6f, 70f, 4f) };
+        for (int i = 0; i < packAt.Length; i++)
+        {
+            Box(IcePack, bottom + rot * (packAt[i] + new Vector3(0f, size.y + 0.025f, 0f)), new Vector3(0.18f, 0.065f, 0.12f), rot * Quaternion.Euler(packTilt[i]));
+        }
+        Vector3[] cubeAt = { new Vector3(-0.32f, 0f, 0.0f), new Vector3(0.14f, 0f, -0.17f), new Vector3(0.33f, 0f, 0.14f) };
+        for (int i = 0; i < cubeAt.Length; i++)
+        {
+            Box(Ice, bottom + rot * (cubeAt[i] + new Vector3(0f, size.y + 0.03f, 0f)), new Vector3(0.06f, 0.06f, 0.06f), rot * Quaternion.Euler(20f * i, 35f * i, 10f));
+        }
         // Handles.
         for (int s = -1; s <= 1; s += 2)
         {

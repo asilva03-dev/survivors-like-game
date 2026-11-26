@@ -6,6 +6,8 @@
  * at least minPitch degrees down, its tip embedDepth into the ground; it stays stickTime, then shrinks away.
  * - The stuck spears come from one shared ComponentPool<StuckSpear> (stuckPrefab, under "Stuck Spears").
  * - maxReach caps how far ahead of the end point the spear may plant itself (a spear ending high up drops straight down).
+ * - (2026-11-25, user: it looked like it teleported into the ground) the stuck spear now flies that last stretch from
+ *   where the spear ended, at the spear's own speed (Projectile.Speed), turning into its planted angle (StuckSpear.PlantFrom).
  */
 
 using UnityEngine;
@@ -23,6 +25,8 @@ public class SpearStick : MonoBehaviour, IProjectileSpent
     [SerializeField, Range(0f, 89f)] private float minPitch = 35f;
     [SerializeField, Min(0f)] private float maxReach = 3f;
     [SerializeField, Min(0)] private int prewarm = 6;
+
+    private Projectile projectile;
 
     public static int Planted { get; private set; }
 
@@ -56,7 +60,13 @@ public class SpearStick : MonoBehaviour, IProjectileSpent
         Vector3 lean = (flat * Mathf.Cos(pitch * Mathf.Deg2Rad) + Vector3.down * Mathf.Sin(pitch * Mathf.Deg2Rad)).normalized;
 
         Vector3 tip = point + lean * (embedDepth / Mathf.Max(0.1f, Mathf.Sin(pitch * Mathf.Deg2Rad)));
-        Pool().Get(tip, Quaternion.LookRotation(lean)).Plant(Pool(), stickTime, shrinkTime);
+        if (projectile == null)
+        {
+            projectile = GetComponent<Projectile>();
+        }
+        float speed = projectile != null ? projectile.Speed : 0f;
+        Quaternion heading = direction.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(direction) : Quaternion.LookRotation(lean);
+        Pool().Get(tip, Quaternion.LookRotation(lean)).PlantFrom(Pool(), stickTime, shrinkTime, where, heading, speed);
         Planted++;
     }
 

@@ -22,3 +22,5 @@ MonoBehaviour:
   targetRadius: 0.4
   detectsShadow: 0
   modeLinger: 1
+  pathReach: 4
+  pathConeAngle: 90

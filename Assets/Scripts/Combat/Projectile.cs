@@ -74,6 +74,8 @@ public class Projectile : MonoBehaviour
     private Transform ignoreRoot;
     private Vector3 direction;
     private float speed;
+    /// <summary>The current flight speed (read-only; the Fishercat's SpearStick flies the spear's last stretch at it).</summary>
+    public float Speed => speed;
     private float lifetime;
     private float age;
     private Vector3 finalDirection;

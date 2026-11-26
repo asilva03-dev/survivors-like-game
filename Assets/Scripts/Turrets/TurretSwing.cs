@@ -8,6 +8,9 @@
  *   ranged mode otherwise. In melee mode the gun's HoldFire is set (no waves). While a rat is within reach it is also the
  *   gun's MeleeTarget, so the tower turns to it; during the linger the gun aims as usual but still holds fire. InMelee.
  * - Swung (direction) is raised after each swing, Swings counts them; for an animation or effect later. No visual yet.
+ * - Path wedge (user 2026-11-25): with SwordSwingStats.pathReach set, the reach is longer (pathReach) inside a cone of
+ *   pathConeAngle facing the tower's nearest path (Turret.RestDirection), both for entering melee mode and for who a
+ *   swing hits (ReachToward / HitReachToward; the slash effect draws the same shape).
  */
 
 using System.Collections.Generic;
@@ -32,6 +35,31 @@ public class TurretSwing : WeaponBase<SwordSwingStats>
     /// <summary>How far a swing reaches (reach + target radius, flat) and its arc, for the slash effect.</summary>
     public float HitReach => Stats.Reach + Stats.TargetRadius;
     public float ArcAngle => Stats.ArcAngle;
+
+    private Turret turret;
+    private Turret Turret => turret != null ? turret : (turret = GetComponentInParent<Turret>());
+
+    /// <summary>The reach toward a flat direction: PathReach inside the cone facing the tower's nearest path (when the
+    /// stats have a wedge), else Reach.</summary>
+    public float ReachToward(Vector3 direction)
+    {
+        if (!Stats.HasPathWedge || Turret == null)
+        {
+            return Stats.Reach;
+        }
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            return Stats.Reach;
+        }
+        return Vector3.Angle(direction, Turret.RestDirection) <= Stats.PathConeAngle * 0.5f ? Stats.PathReach : Stats.Reach;
+    }
+
+    /// <summary>ReachToward plus the target radius: how far a swing hits in that direction (for the slash effect).</summary>
+    public float HitReachToward(Vector3 direction)
+    {
+        return ReachToward(direction) + Stats.TargetRadius;
+    }
 
     private void OnDisable()
     {
@@ -62,7 +90,7 @@ public class TurretSwing : WeaponBase<SwordSwingStats>
 
             Vector3 offset = Flat(candidate.transform.position - from);
             float distance = offset.magnitude - candidate.TargetRadius - Stats.TargetRadius;
-            if (distance > Stats.Reach)
+            if (distance > ReachToward(offset))
             {
                 continue;
             }
