@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d49d9a80639eae4787776ee10953315, type: 3}
+  m_Name: Fishercat_P1_T3
+  m_EditorClassIdentifier: Assembly-CSharp::TurretUpgrade
+  upgradeName: Spear Gun
+  description: Shoots a fan of spears at a time, faster than throwing.
+  woodCost: 60
+  effectBuilt: 1
+  damageAdd: 0
+  fireRateMultiplier: 1.3
+  rangeAdd: 0
+  pierceAdd: 0
+  projectilesAdd: 2
+  enableHoming: 0
+  homingStrength: 0
+  homingRadius: 0
+  rangeMultiplier: 1
+  grantsShadowDetection: 0
+  projectileSpeedMultiplier: 1.8
+  bodyMesh: {fileID: 0}
+  slowPerStack: 0
+  slowMaxStacks: 5
+  slowDuration: 3
+  stunDuration: 0
+  stunImmunity: 2
+  infectChance: 0
+  infectRadius: 2.5
+  explosionChance: 0
+  explosionTargets: 3
+  explosionDamage: 10
+  explosionRadius: 2
+  shrapnelCount: 0
+  reelUnlock: 0
+  reelHpCap: 0
+  reelLightRange: 0

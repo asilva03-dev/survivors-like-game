@@ -9,6 +9,8 @@
  *   model) and the volley goes off there.
  * - The arrow hit nothing (its rat died first, or it ran out of range): no volley; it just disappears.
  * - The tower's arrow stays for the whole volley (ArrowVolleyStats.TotalTime) and shrinks with it.
+ * - Volley numbers come from the firing tower's AngelcatVolley (its own, upgradable copy; 2026-11-25), found through
+ *   Projectile.Shooter; `volleyStats` here is only the fallback.
  * - Ground height from MapGround when there is one, else y 0 (GroundPoint).
  * - Shared pools "Stuck Arrows", "Enemy Arrows" and "Arrow Volleys". Counters Volleys / StuckInRat / StuckInGround for tests.
  */
@@ -37,6 +39,7 @@ public class AngelArrowStick : MonoBehaviour, IProjectileHit, IProjectileSpent
     [SerializeField, Range(0f, 89f)] private float minPitch = 40f;
     [SerializeField, Min(0)] private int prewarm = 4;
 
+    private Projectile projectile;
     private Damageable hitRat;
     private Vector3 ratSpot;
     private bool killed;
@@ -87,13 +90,14 @@ public class AngelArrowStick : MonoBehaviour, IProjectileHit, IProjectileSpent
     {
         Damageable rat = hitRat;
         hitRat = null;
-        if (rat == null || volleyStats == null)
+        ArrowVolleyStats stats = StatsInUse();
+        if (rat == null || stats == null)
         {
             return;
         }
 
-        float stay = volleyStats.TotalTime;
-        float shrink = volleyStats.ShrinkTime;
+        float stay = stats.TotalTime;
+        float shrink = stats.ShrinkTime;
         Vector3 centre;
         Damageable follow = null;
 
@@ -128,9 +132,21 @@ public class AngelArrowStick : MonoBehaviour, IProjectileHit, IProjectileSpent
         if (volleyPrefab != null)
         {
             ComponentPool<ArrowVolley> volleys = VolleyPool();
-            volleys.Get(centre, Quaternion.identity).Launch(volleys, volleyStats, centre, follow);
+            volleys.Get(centre, Quaternion.identity).Launch(volleys, stats, centre, follow);
             Volleys++;
         }
+    }
+
+    // The firing tower's own volley stats (AngelcatVolley, found from Projectile.Shooter), else the shared asset.
+    private ArrowVolleyStats StatsInUse()
+    {
+        if (projectile == null)
+        {
+            projectile = GetComponent<Projectile>();
+        }
+        Transform shooter = projectile != null ? projectile.Shooter : null;
+        AngelcatVolley tower = shooter != null ? shooter.GetComponentInParent<AngelcatVolley>() : null;
+        return tower != null && tower.Stats != null ? tower.Stats : volleyStats;
     }
 
     private ComponentPool<StuckSpear> GroundPool()

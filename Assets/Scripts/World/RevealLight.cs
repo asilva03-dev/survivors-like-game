@@ -19,6 +19,12 @@ public class RevealLight : MonoBehaviour
 
     public float Radius => radius;
 
+    /// <summary>Changes the radius at run time (2026-11-26, the Fishercat's pool grows with its tier).</summary>
+    public void SetRadius(float value)
+    {
+        radius = Mathf.Max(0f, value);
+    }
+
     private void OnEnable()
     {
         Active.Add(this);

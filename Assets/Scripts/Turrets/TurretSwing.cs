@@ -39,6 +39,15 @@ public class TurretSwing : WeaponBase<SwordSwingStats>
     private Turret turret;
     private Turret Turret => turret != null ? turret : (turret = GetComponentInParent<Turret>());
 
+    /// <summary>The stats in use: the shared asset until an upgrade is bought, then the turret's own copy.</summary>
+    public SwordSwingStats CurrentStats => Stats;
+
+    /// <summary>Swaps in other stats (Turret hands over its own upgraded copy; 2026-11-25 upgrade pass).</summary>
+    public void UseStats(SwordSwingStats replacement)
+    {
+        ReplaceStats(replacement);
+    }
+
     /// <summary>The reach toward a flat direction: PathReach inside the cone facing the tower's nearest path (when the
     /// stats have a wedge), else Reach.</summary>
     public float ReachToward(Vector3 direction)

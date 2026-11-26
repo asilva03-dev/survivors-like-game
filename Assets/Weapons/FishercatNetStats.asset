@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1af837358ab568443bc66e5833ede5b3, type: 3}
+  m_Name: FishercatNetStats
+  m_EditorClassIdentifier: Assembly-CSharp::FishercatNetStats
+  unlocked: 0
+  cooldown: 5
+  radius: 0.6
+  stunTime: 1.2
+  spikeDamage: 0
+  fatStunTime: 0
+  persistTime: 0
+  pullReach: 2.5
+  pullSpeed: 3
+  range: 0
+  flightTime: 0.5

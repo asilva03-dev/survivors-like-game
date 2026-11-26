@@ -23,6 +23,27 @@ MonoBehaviour:
   sellRefundShare: 0.5
   idleScanAngle: 40
   idleScanPeriod: 4
-  paths: []
+  paths:
+  - name: Spears
+    tiers:
+    - {fileID: 11400000, guid: 26316c4b076fe8648a8e831016ebe9a2, type: 2}
+    - {fileID: 11400000, guid: d0df54d4a867d0240a9770282e9d5e4d, type: 2}
+    - {fileID: 11400000, guid: f33007ee02aaf3c4aad465f0d387200c, type: 2}
+    - {fileID: 11400000, guid: bd0b01510fe35604c8cb04814d238c17, type: 2}
+    - {fileID: 11400000, guid: 9d2575d02b3b8a249abc9ebe6ed31b24, type: 2}
+  - name: Nets
+    tiers:
+    - {fileID: 11400000, guid: 75b27c220d068a047a9ac268a2b8baec, type: 2}
+    - {fileID: 11400000, guid: 9ad290c834d89ea4b94d9069fdb716a5, type: 2}
+    - {fileID: 11400000, guid: 612faaa48569ee3408ae2e36d469ce81, type: 2}
+    - {fileID: 11400000, guid: cdba8c60448f1a948a4820e8f7174f97, type: 2}
+    - {fileID: 11400000, guid: 407e717d23a08d6409f224284cdc817c, type: 2}
+  - name: Water
+    tiers:
+    - {fileID: 11400000, guid: 46cd50d0351c20d4198d6d7e3d31d230, type: 2}
+    - {fileID: 11400000, guid: dc121cac2ce51644c815b5cafc7bcc92, type: 2}
+    - {fileID: 11400000, guid: 389c479f7a4b7104588a1bfb7a987e35, type: 2}
+    - {fileID: 11400000, guid: b4aa5f5963f575a48aff5f8aa27eae9b, type: 2}
+    - {fileID: 11400000, guid: ec555e6fc5c26784499bbe8ba91826ba, type: 2}
   mainPathMaxTier: 5
   secondPathMaxTier: 2

@@ -11,7 +11,11 @@
  * - RestDirection (set in Init): toward the nearest Path cell within 12 cells (else the nearest walkable cell,
  *   else north). The gun starts facing it and scans around it while idle (see TurretGun).
  * - Range comes from its TurretGun, or (2026-11-23, Trapper) its TrapThrower when it has no gun; SpacingRadius from the
- *   definition. Upgrades and the body-model swap only apply to gun turrets (a turret without a gun has no stats to change). The no-build area is the set of tiles its
+ *   definition. Upgrades (since 2026-11-25, all towers): every bought tier is applied to this turret's own copies of the
+ *   stats of each weapon it has (TurretGun's GunStats, TrapThrower's TrapperStats, TurretSwing's SwordSwingStats,
+ *   AngelcatVolley's ArrowVolleyStats; 2026-11-26 FishercatReel's FishercatReelStats and FishercatNetThrower's FishercatNetStats and FishercatFishing's FishercatFishingStats, only on towers that have
+ *   them), each
+ *   handed back with UseStats; the body-model swap needs bodyModel. The no-build area is the set of tiles its
  *   spacing circle touches (CircleTouches; the tile rule, slice 6); BuildStripHighlight paints those strip tiles red.
  *   Static event ActiveChanged fires when a turret is placed or removed.
  * - Upgrades (slice 6 step 5): Tier(path), NextUpgrade(path), CanUpgrade(path, out reason) (the Bloons rule from the
@@ -65,6 +69,28 @@ public class Turret : MonoBehaviour
     private GunStats baseStats;
     private GunStats upgradedStats;
     private Mesh baseBodyMesh;
+
+    // The tower's other upgradable weapons (2026-11-25 upgrade pass), found in Awake; each gets its own upgraded copy.
+    private TurretSwing swing;
+    private AngelcatVolley volley;
+    private TrapperStats baseTrapperStats;
+    private TrapperStats upgradedTrapperStats;
+    private SwordSwingStats baseSwingStats;
+    private SwordSwingStats upgradedSwingStats;
+    private ArrowVolleyStats baseVolleyStats;
+    private ArrowVolleyStats upgradedVolleyStats;
+    // Fishercat reel (2026-11-26): only towers with a FishercatReel have these.
+    private FishercatReel reel;
+    private FishercatReelStats baseReelStats;
+    private FishercatReelStats upgradedReelStats;
+    // Fishercat nets (2026-11-26): only towers with a FishercatNetThrower have these.
+    private FishercatNetThrower netThrower;
+    private FishercatNetStats baseNetStats;
+    private FishercatNetStats upgradedNetStats;
+    // Fishercat fishing (2026-11-26): only towers with a FishercatFishing have these.
+    private FishercatFishing fishing;
+    private FishercatFishingStats baseFishingStats;
+    private FishercatFishingStats upgradedFishingStats;
 
     // Raised after an upgrade is bought (the panel refreshes).
     public event System.Action Upgraded;
@@ -174,39 +200,107 @@ public class Turret : MonoBehaviour
         return true;
     }
 
-    // Base stats copy + every bought tier (path by path, in order), handed to the gun.
+    // For each weapon the tower has: a fresh copy of its base stats + every bought tier (path by path, in order), handed
+    // to that weapon. The gun part is unchanged from slice 6; the thrower, swing and volley parts were added 2026-11-25.
     private void RebuildStats()
     {
-        if (gun == null || baseStats == null)
-        {
-            return;
-        }
+        upgradedStats = Fresh(gun != null ? baseStats : null, upgradedStats);
+        upgradedTrapperStats = Fresh(thrower != null ? baseTrapperStats : null, upgradedTrapperStats);
+        upgradedSwingStats = Fresh(swing != null ? baseSwingStats : null, upgradedSwingStats);
+        upgradedVolleyStats = Fresh(volley != null ? baseVolleyStats : null, upgradedVolleyStats);
+        upgradedReelStats = Fresh(reel != null ? baseReelStats : null, upgradedReelStats);
+        upgradedNetStats = Fresh(netThrower != null ? baseNetStats : null, upgradedNetStats);
+        upgradedFishingStats = Fresh(fishing != null ? baseFishingStats : null, upgradedFishingStats);
 
-        if (upgradedStats != null)
-        {
-            Destroy(upgradedStats);
-        }
-
-        upgradedStats = Instantiate(baseStats);
-        upgradedStats.name = baseStats.name + " (" + name + ")";
         Mesh body = baseBodyMesh;
         for (int path = 0; path < tiers.Length; path++)
         {
             for (int tier = 0; tier < tiers[path]; tier++)
             {
                 TurretUpgrade upgrade = definition.Paths[path].tiers[tier];
-                upgrade.ApplyTo(upgradedStats);
+                if (upgradedStats != null)
+                {
+                    upgrade.ApplyTo(upgradedStats);
+                }
+                if (upgradedTrapperStats != null)
+                {
+                    upgrade.ApplyTo(upgradedTrapperStats);
+                }
+                if (upgradedSwingStats != null)
+                {
+                    upgrade.ApplyTo(upgradedSwingStats);
+                }
+                if (upgradedVolleyStats != null)
+                {
+                    upgrade.ApplyTo(upgradedVolleyStats);
+                }
+                if (upgradedReelStats != null)
+                {
+                    upgrade.ApplyTo(upgradedReelStats);
+                }
+                if (upgradedNetStats != null)
+                {
+                    upgrade.ApplyTo(upgradedNetStats);
+                }
+                if (upgradedFishingStats != null)
+                {
+                    upgrade.ApplyTo(upgradedFishingStats);
+                }
                 if (upgrade.BodyMesh != null)
                 {
                     body = upgrade.BodyMesh;
                 }
             }
         }
-        gun.UseStats(upgradedStats);
+
+        if (upgradedStats != null)
+        {
+            gun.UseStats(upgradedStats);
+        }
+        if (upgradedTrapperStats != null)
+        {
+            thrower.UseStats(upgradedTrapperStats);
+        }
+        if (upgradedSwingStats != null)
+        {
+            swing.UseStats(upgradedSwingStats);
+        }
+        if (upgradedVolleyStats != null)
+        {
+            volley.UseStats(upgradedVolleyStats);
+        }
+        if (upgradedReelStats != null)
+        {
+            reel.UseStats(upgradedReelStats);
+        }
+        if (upgradedNetStats != null)
+        {
+            netThrower.UseStats(upgradedNetStats);
+        }
+        if (upgradedFishingStats != null)
+        {
+            fishing.UseStats(upgradedFishingStats);
+        }
         if (bodyModel != null && body != null)
         {
             bodyModel.sharedMesh = body;
         }
+    }
+
+    // Destroys the old copy and returns a new copy of the base (null when the tower has no such weapon).
+    private T Fresh<T>(T baseAsset, T old) where T : ScriptableObject
+    {
+        if (old != null)
+        {
+            Destroy(old);
+        }
+        if (baseAsset == null)
+        {
+            return null;
+        }
+        T copy = Instantiate(baseAsset);
+        copy.name = baseAsset.name + " (" + name + ")";
+        return copy;
     }
 
     public void Init(TurretDefinition turretDefinition, Vector2Int cell)
@@ -322,6 +416,17 @@ public class Turret : MonoBehaviour
         }
         baseStats = gun != null ? gun.CurrentStats : null;
         baseBodyMesh = bodyModel != null ? bodyModel.sharedMesh : null;
+        swing = GetComponentInChildren<TurretSwing>();
+        volley = GetComponentInChildren<AngelcatVolley>();
+        baseTrapperStats = thrower != null ? thrower.Stats : null;
+        baseSwingStats = swing != null ? swing.CurrentStats : null;
+        baseVolleyStats = volley != null ? volley.Stats : null;
+        reel = GetComponent<FishercatReel>();
+        baseReelStats = reel != null ? reel.Stats : null;
+        netThrower = GetComponent<FishercatNetThrower>();
+        baseNetStats = netThrower != null ? netThrower.Stats : null;
+        fishing = GetComponent<FishercatFishing>();
+        baseFishingStats = fishing != null ? fishing.Stats : null;
     }
 
     private void OnDestroy()
@@ -329,6 +434,30 @@ public class Turret : MonoBehaviour
         if (upgradedStats != null)
         {
             Destroy(upgradedStats);
+        }
+        if (upgradedTrapperStats != null)
+        {
+            Destroy(upgradedTrapperStats);
+        }
+        if (upgradedSwingStats != null)
+        {
+            Destroy(upgradedSwingStats);
+        }
+        if (upgradedVolleyStats != null)
+        {
+            Destroy(upgradedVolleyStats);
+        }
+        if (upgradedReelStats != null)
+        {
+            Destroy(upgradedReelStats);
+        }
+        if (upgradedNetStats != null)
+        {
+            Destroy(upgradedNetStats);
+        }
+        if (upgradedFishingStats != null)
+        {
+            Destroy(upgradedFishingStats);
         }
     }
 

@@ -13,6 +13,8 @@
  *   turn back to the aim direction at curveTurnSpeed degrees per second, so the arc is only at the
  *   start and they then fly straight, parallel to the others. A higher start angle or lower turn
  *   speed makes a wider, longer arc. projectileSpacing is the side-by-side gap in units.
+ * - fanAngle (2026-11-26, Fishercat Spear Gun, opt-in): 0 on every asset = the layout above. > 0 = all projectileCount
+ *   bullets leave from the muzzle spread evenly in a fan, fanAngle degrees apart, and fly straight (no curving extras).
  * - pierce (BTD meaning since 2026-11-20, user): how many enemies a bullet hits before it is used up. 1 = stops at
  *   the first hit (default), 2 = hits two, and so on; each hit deals full damage and each target is hit at most once
  *   per bullet. (Before 2026-11-20 it counted extra hits: old 0 = new 1; the assets were moved up by 1.)
@@ -52,6 +54,8 @@ public class GunStats : AimedWeaponStats
     [SerializeField, Range(0f, 120f)] private float curveStartAngle = 50f;
     [SerializeField, Range(0f, 90f)] private float curveAngleStep = 25f;
     [SerializeField, Min(1f)] private float curveTurnSpeed = 240f;
+    [Tooltip("0 = the usual side-by-side shot. > 0 = every bullet of a shot leaves from the muzzle in a fan, this many degrees apart (Fishercat spear gun).")]
+    [SerializeField, Range(0f, 45f)] private float fanAngle;
     [Tooltip("Enemies one bullet hits before it is used up (1 = the first enemy only).")]
     [SerializeField, Min(1)] private int pierce = 1;
     [SerializeField] private bool homing;
@@ -96,6 +100,17 @@ public class GunStats : AimedWeaponStats
     public void AddProjectiles(int amount)
     {
         projectileCount = Mathf.Max(1, projectileCount + amount);
+    }
+
+    // Faster bullets with the same reach: speed x multiplier, lifetime / multiplier (2026-11-26, Fishercat Spear Gun).
+    public void ScaleProjectileSpeed(float multiplier)
+    {
+        if (multiplier <= 0f)
+        {
+            return;
+        }
+        projectileSpeed *= multiplier;
+        lifetime /= multiplier;
     }
 
     public void SetHoming(bool on)
@@ -171,6 +186,7 @@ public class GunStats : AimedWeaponStats
     public float CurveStartAngle => curveStartAngle;
     public float CurveAngleStep => curveAngleStep;
     public float CurveTurnSpeed => curveTurnSpeed;
+    public float FanAngle => fanAngle;
     public Projectile ProjectilePrefab => projectilePrefab;
     public int PrewarmCount => prewarmCount;
     public float ProjectileSpeed => projectileSpeed;

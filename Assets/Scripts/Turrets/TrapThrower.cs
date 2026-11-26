@@ -23,7 +23,8 @@
  *   The animator turns the cat (Body); the crates and sack never turn. (This replaced change 6's aim-then-throw turn.)
  *   Without an animator it throws every interval from `hand` without turning.
  * - Traps come from one shared ComponentPool<RatTrap> (trapPrefab, under "Rat Traps"), never instantiated per throw.
- * - Range is the stats' range (Turret.Range uses it for the range ring and the build ghost). No upgrades yet (user).
+ * - Range is the stats' range (Turret.Range uses it for the range ring and the build ghost). Upgrades (2026-11-25):
+ *   Turret hands over its own upgraded copy of the stats with UseStats; no Trapper tiers exist yet.
  */
 
 using System.Collections.Generic;
@@ -52,6 +53,16 @@ public class TrapThrower : MonoBehaviour
 
     public float Range => stats != null ? stats.Range : 0f;
     public TrapperStats Stats => stats;
+
+    /// <summary>Swaps in other stats (Turret hands over its own upgraded copy; 2026-11-25 upgrade pass). New throws and
+    /// traps use them; traps already thrown keep theirs.</summary>
+    public void UseStats(TrapperStats replacement)
+    {
+        if (replacement != null)
+        {
+            stats = replacement;
+        }
+    }
     /// <summary>Traps of this Trapper flying or set right now.</summary>
     public int LiveTraps
     {

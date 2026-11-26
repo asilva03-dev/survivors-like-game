@@ -72,6 +72,8 @@ public class Projectile : MonoBehaviour
     private ComponentPool<Projectile> pool;
     private WeaponStats stats;
     private Transform ignoreRoot;
+    /// <summary>The owner it was launched with (read-only; the Angel Cat's arrows find their tower through it).</summary>
+    public Transform Shooter => ignoreRoot;
     private Vector3 direction;
     private float speed;
     /// <summary>The current flight speed (read-only; the Fishercat's SpearStick flies the spear's last stretch at it).</summary>

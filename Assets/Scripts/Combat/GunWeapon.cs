@@ -14,6 +14,9 @@
  *   from the outer spots, alternating right and left, angled outward and turning back to the aim
  *   direction (see GunStats), so they arc out of the way of the others and then fly straight and
  *   parallel to them (no homing).
+ * - GunStats.fanAngle > 0 (opt-in, only the Fishercat's spears): all bullets leave from the muzzle in an even fan instead.
+ * - muzzlePoint (opt-in, 2026-11-26, empty on every other gun): while that object is active, shots leave from it (the
+ *   Fishercat's spear gun mouth) instead of transform + forward x MuzzleOffset.
  * - With GunStats.homing on, every bullet (the curving ones too, they skip their fixed settle arc)
  *   steers at the target from launch, and takes the weapon's current target from the shared
  *   targeting (WeaponLoadout) if its own target dies in flight.
@@ -26,6 +29,9 @@ using UnityEngine;
 public class GunWeapon : AimedWeapon<GunStats>
 {
     private const int StraightLimit = 3;
+
+    [Tooltip("Optional: while this object is active, shots leave from it instead of the stats' muzzle offset (Fishercat spear gun).")]
+    [SerializeField] private Transform muzzlePoint;
 
     private ComponentPool<Projectile> pool;
     private Transform poolRoot;
@@ -51,7 +57,9 @@ public class GunWeapon : AimedWeapon<GunStats>
 
     protected override void Fire(Damageable target)
     {
-        Vector3 muzzle = transform.position + transform.forward * Stats.MuzzleOffset;
+        Vector3 muzzle = muzzlePoint != null && muzzlePoint.gameObject.activeInHierarchy
+            ? muzzlePoint.position
+            : transform.position + transform.forward * Stats.MuzzleOffset;
         bool targetBeyondMuzzle = Vector3.Dot(target.AimPoint - muzzle, transform.forward) > 0f;
         Vector3 origin = targetBeyondMuzzle ? muzzle : transform.position;
 
@@ -61,6 +69,16 @@ public class GunWeapon : AimedWeapon<GunStats>
         Vector3 right = Vector3.Cross(Vector3.up, direction).normalized;
         float spacing = Stats.ProjectileSpacing;
         int count = Stats.ProjectileCount;
+        if (Stats.FanAngle > 0f)
+        {
+            // Opt-in fan (2026-11-26, Fishercat): every bullet from the muzzle, evenly spread, flying straight.
+            for (int i = 0; i < count; i++)
+            {
+                float angle = (i - (count - 1) * 0.5f) * Stats.FanAngle;
+                Spawn(origin, Quaternion.AngleAxis(angle, Vector3.up) * direction, null, target);
+            }
+            return;
+        }
         int straight = Mathf.Min(count, StraightLimit);
 
         for (int i = 0; i < straight; i++)

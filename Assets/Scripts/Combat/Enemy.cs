@@ -52,6 +52,8 @@
  *   stunDuration (stacks cleared), then it can't be stunned again for stunImmunity seconds; an enemy whose stats are
  *   StunImmune (bag rat) is never stunned and just stays at the full stack. A stunned enemy doesn't bite
  *   or dive. All reset on enable (pooling).
+ * - SlowInZone(multiplier, duration) (2026-11-26, Fishercat water only): a separate slow on top of the stacks.
+ * - Stun(duration, force) (2026-11-26, Fishercat nets only): a plain stun; force also stuns StunImmune enemies.
  * - Knockback(direction, distance, duration) pushes the enemy away with an ease-out; while it lasts
  *   EnemyMovementSystem pauses seeking and applies TakeKnockbackStep each frame.
  */
@@ -96,6 +98,9 @@ public class Enemy : Damageable
     private float slowPerStack;
     private float slowTimer;
     private float stunTimer;
+    // Zone slow (2026-11-26, Fishercat water; only SlowInZone sets it): 1 = none.
+    private float zoneSlow = 1f;
+    private float zoneSlowTimer;
     private float stunImmuneTimer;
     private HunterState hunterState;
     private float lingerTimer;
@@ -119,7 +124,33 @@ public class Enemy : Damageable
     public int SlowStacks { get; private set; }
     public bool IsStunned => stunTimer > 0f;
     /// <summary>Move speed multiplier from slows / stun (1 = normal, 0 = stunned).</summary>
-    public float SpeedMultiplier => IsStunned ? 0f : Mathf.Max(0.1f, 1f - SlowStacks * slowPerStack);
+    public float SpeedMultiplier => IsStunned ? 0f : Mathf.Max(0.1f, 1f - SlowStacks * slowPerStack) * (zoneSlowTimer > 0f ? zoneSlow : 1f);
+
+    /// <summary>
+    /// Slows the enemy to `multiplier` of its speed for `duration` seconds, on top of slow stacks (2026-11-26, Fishercat
+    /// water: called every frame while it stands in the pool; nothing else calls it). The strongest current one wins.
+    /// </summary>
+    public void SlowInZone(float multiplier, float duration)
+    {
+        multiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
+        zoneSlow = zoneSlowTimer > 0f ? Mathf.Min(zoneSlow, multiplier) : multiplier;
+        zoneSlowTimer = Mathf.Max(zoneSlowTimer, duration);
+    }
+
+    /// <summary>
+    /// A plain stun (2026-11-26, Fishercat nets; nothing else calls it): stops the enemy for `duration` (a longer stun it
+    /// already has is kept). Stun-immune enemies (bag rat) only when `force` (Durable Net). Slow stacks and the Optics stun
+    /// immunity window are untouched. Returns false when it didn't stun.
+    /// </summary>
+    public bool Stun(float duration, bool force)
+    {
+        if (!isActiveAndEnabled || Health <= 0f || duration <= 0f || (!force && stats != null && stats.StunImmune))
+        {
+            return false;
+        }
+        stunTimer = Mathf.Max(stunTimer, duration);
+        return true;
+    }
 
     /// <summary>Adds one slow stack (see the header). Returns false when it couldn't (dead/disabled).</summary>
     public bool AddSlowStack(float perStack, int maxStacks, float duration, float stunDuration, float stunImmunity)
@@ -234,6 +265,8 @@ public class Enemy : Damageable
         slowTimer = 0f;
         stunTimer = 0f;
         stunImmuneTimer = 0f;
+        zoneSlow = 1f;
+        zoneSlowTimer = 0f;
         hunterState = HunterState.Hunt;
         HasMoveGoal = false;
         Assignment = IsHunter ? EnemyAssignment.Player : EnemyAssignment.Base;
@@ -256,6 +289,10 @@ public class Enemy : Damageable
         if (stunTimer > 0f)
         {
             stunTimer -= dt;
+        }
+        if (zoneSlowTimer > 0f)
+        {
+            zoneSlowTimer -= dt;
         }
         if (stunImmuneTimer > 0f)
         {
